@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+
+# Xcode: per-user state and build output
+xcuserdata/
+DerivedData/
+build/
+*.xcuserstate
+
+# The command-line tools' compiled programs (made by Tools/build.sh)
+Tools/build/
+
+# Design-review screenshots (large; made while working, not part of the app)
+.impeccable/

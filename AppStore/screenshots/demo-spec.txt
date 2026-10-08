@@ -1,0 +1,8 @@
+# Simulator captures, framed — until real device shots replace them (see AppStore/README.md step 7).
+# image | caption | chameleon colour (natural, sun, bubblegum, sky, tangerine, cherry)
+sources/iphone-home.png | Hide and seek in your real room | natural
+sources/iphone-seekers-turn.png | Pass it on. Start the clock. | bubblegum
+sources/iphone-hunt-intro.png | Squad up with friends | sun
+sources/iphone-lobby.png | Everyone on their own phone | sky
+sources/ipad-home.png | Hide and seek in your real room | natural
+sources/ipad-seekers-turn.png | Pass it on. Start the clock. | bubblegum

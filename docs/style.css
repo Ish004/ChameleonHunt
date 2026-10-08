@@ -1,0 +1,112 @@
+/* ChameleonHunt's website: the show's violet stage, Lilita lettering with an ink
+   outline, white stickers with ink edges and hard shadows — the same look as the game. */
+
+:root {
+  --stage-top: #7d4fff;
+  --stage: #5a2ee2;
+  --stage-bottom: #3a1aa4;
+  --card: #2c158c;
+  --ink: #1a0b3b;
+  --paper: #ffffff;
+  --paper-lip: #c9bff0;
+  --lime: #8ce04a;
+  --lime-lip: #4e9c27;
+  --sun: #ffd23f;
+  --pink: #ff4fa6;
+  --cyan: #3ed3ff;
+  --text: #ffffff;
+  --muted: rgba(255, 255, 255, 0.82);
+}
+
+* { box-sizing: border-box; }
+
+html { background: var(--stage-bottom); }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--text);
+  font: 600 18px/1.55 ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", sans-serif;
+  background:
+    repeating-conic-gradient(from 10deg at 50% 18%, rgba(255, 255, 255, 0.055) 0deg 16deg, transparent 16deg 40deg),
+    linear-gradient(var(--stage-top), var(--stage) 45%, var(--stage-bottom));
+  background-attachment: fixed;
+}
+
+a { color: var(--sun); text-underline-offset: 3px; }
+a:hover { color: var(--text); }
+::selection { background: var(--sun); color: var(--ink); }
+
+.wrap { width: min(760px, 100% - 32px); margin: 0 auto; padding: 48px 0 72px; }
+
+.show {
+  font-family: "Lilita One", ui-rounded, system-ui, sans-serif;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  line-height: 0.95;
+  color: var(--text);
+  -webkit-text-stroke: 0.08em var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 0.07em 0 var(--ink);
+}
+
+h1.show { font-size: clamp(44px, 9vw, 92px); margin: 0; transform: rotate(-3deg); transform-origin: left; }
+h1.show .lime { color: var(--lime); }
+h2.show { font-size: clamp(26px, 5vw, 36px); margin: 48px 0 14px; }
+
+.lede { font-size: clamp(19px, 3vw, 23px); color: var(--muted); max-width: 36em; margin: 22px 0 0; }
+
+.sticker {
+  background: var(--paper);
+  color: var(--ink);
+  border: 3px solid var(--ink);
+  border-radius: 22px;
+  box-shadow: 0 6px 0 var(--ink);
+  padding: 22px 24px;
+}
+.sticker h3 { font-family: "Lilita One", ui-rounded, sans-serif; font-weight: 400; font-size: 24px; margin: 0 0 4px; text-transform: uppercase; }
+.sticker p { margin: 0; color: rgba(26, 11, 59, 0.72); }
+
+.cards { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-top: 18px; }
+
+.key {
+  display: inline-block;
+  font-family: "Lilita One", ui-rounded, sans-serif;
+  font-size: 22px;
+  text-decoration: none;
+  color: var(--ink);
+  background: var(--lime);
+  border: 3px solid var(--ink);
+  border-radius: 22px;
+  padding: 12px 26px;
+  box-shadow: 0 6px 0 var(--ink);
+}
+.key:hover { color: var(--ink); transform: translateY(2px); box-shadow: 0 4px 0 var(--ink); }
+.key.soon { background: var(--paper); }
+
+.hero { display: grid; gap: 28px; align-items: center; grid-template-columns: 1fr; }
+.hero img { width: min(520px, 100%); justify-self: center; filter: drop-shadow(0 10px 0 rgba(26, 11, 59, 0.35)); }
+@media (min-width: 820px) {
+  .wrap.wide { width: min(1100px, 100% - 48px); }
+  .hero { grid-template-columns: 1.1fr 1fr; }
+}
+
+.prose h2.show { margin-top: 40px; }
+.prose p, .prose li { color: var(--muted); }
+.prose strong { color: var(--text); }
+.prose ul { padding-left: 1.2em; }
+/* Inside a white sticker the page's pale text would be white on white (it was, on the
+   help page's answers): dark ink there, whatever the page around it uses. */
+.prose .sticker p, .prose .sticker li { color: rgba(26, 11, 59, 0.72); }
+.prose .sticker strong { color: var(--ink); }
+.sticker a { color: var(--stage); }
+.sticker a:hover { color: var(--ink); }
+
+.faq { display: grid; gap: 14px; margin-top: 14px; }
+
+footer { margin-top: 64px; color: var(--muted); font-size: 15px; }
+footer a { color: var(--text); }
+nav { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 36px; font-weight: 700; }
+nav a { color: var(--text); text-decoration: none; }
+nav a:hover { color: var(--sun); }
