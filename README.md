@@ -222,7 +222,7 @@ What's New, as a starting point for your own words (the earlier one is kept unde
 also fixes a line that had been wrong since v7.7: a find gets an outline in the finder's
 colour, it doesn't turn that colour all over.
 
-**Tests.** 21 new core checks (the stuck games, leaving mid-hunt, find times on the wire
+**Tests.** 23 new core checks (the stuck games, leaving mid-hunt, find times on the wire
 and from older builds, best times). The core tests also run on Linux now, against a small
 stand-in for Apple's `simd`, which is how this version was checked off a Mac.
 
