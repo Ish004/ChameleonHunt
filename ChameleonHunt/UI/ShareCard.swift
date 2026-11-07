@@ -8,6 +8,7 @@
 //  It's the game's cheapest marketing: every round played can turn into a post.
 //
 
+import StoreKit
 import SwiftUI
 import UIKit
 
@@ -106,10 +107,38 @@ enum ShareCard {
     }
 }
 
-/// Where the game lives online. Fill these in once they exist; until then anything that
-/// would use them leaves them out.
+/// Where the game lives online. Anything that would use a link leaves it out until it
+/// leads somewhere.
+@MainActor
 enum AppLinks {
     /// The App Store page: https://apps.apple.com/app/id<the number App Store Connect
     /// shows under App Information → Apple ID>.
-    static let appStore: URL? = URL(string: "https://apps.apple.com/app/id6820470141")
+    static let storePage = URL(string: "https://apps.apple.com/app/id6820470141")
+
+    /// The store page, but only in a copy of the game that came from the App Store. In
+    /// TestFlight (and in test builds) the page doesn't exist yet: the lobby's QR code and
+    /// every shared picture led friends to "not available" (v7.8).
+    static var appStore: URL? { StoreOrigin.shared.isFromAppStore ? storePage : nil }
+
+    /// Asks StoreKit where this copy came from. Once, at launch.
+    static func checkWhereFrom() async {
+        #if DEBUG
+        // `-debugStoreLinks` shows them anyway, for screenshots.
+        StoreOrigin.shared.isFromAppStore = ProcessInfo.processInfo.arguments.contains("-debugStoreLinks")
+        #else
+        guard let result = try? await AppTransaction.shared else { return }
+        switch result {
+        case .verified(let transaction), .unverified(let transaction, _):
+            StoreOrigin.shared.isFromAppStore = transaction.environment == .production
+        }
+        #endif
+    }
+}
+
+/// Where this copy came from, published, so a screen already showing (the lobby's QR
+/// code) updates when StoreKit answers.
+@MainActor
+final class StoreOrigin: ObservableObject {
+    static let shared = StoreOrigin()
+    @Published fileprivate(set) var isFromAppStore = false
 }

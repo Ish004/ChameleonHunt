@@ -164,6 +164,10 @@ One job per colour:
 | `Notice` / `NoticeView` (Notice.swift) | Every question and message: a white sticker card with a symbol tile, a Lilita title, one sentence, at most two keys |
 | `DropCard` (DesignSystem.swift) | The studio's drop-downs (pose, options, colour), used instead of popovers and menus |
 | `ShareCard` (ShareCard.swift) | The shared picture: the camera's view of the room, and a violet strip with the headline in outlined Lilita ("Can you spot it?", "Found in 0:49") and the mascot. The share sheet itself is the system's — the one system surface we use, because it's where the player's apps and friends are |
+| Best time (PhaseViews.swift, `ResultView`) | Swarm's results, under the coins: a `HUDPill` with a trophy, "New best · 6 on Hard · 1:12" on sun when the round set it (sun is first place), otherwise "Best · …" on paper. On a phone on its side it's a `Stat` in the stats row (no height for another line) (v7.8) |
+| Fastest find (SquadViews.swift) | Squad results: a `HUDPill` with a bolt in the finder's colour, "Fastest find · Ben · 0:12", above "Colours show who scored"; on a phone on its side, over the board (v7.8) |
+| Network tip (SquadViews.swift, `NetworkTip`) | After a while with nobody turning up (12 s in Games nearby, 20 s alone in a host's lobby): one muted sentence with the two usual reasons, and a paper **Open Settings** key (v7.8) |
+| Camera is off (`Notice.cameraOff`) | The one card for a refused camera: cyan tile, "Camera is off", **Open Settings** as the main key, "Not now" (v7.8) |
 | Reconnecting banner (SquadViews.swift) | A sun sticker with hopping dots near the bottom: "Reconnecting to Ana". The game carries on under it |
 | `ColourPanel` (StudioView.swift) | The game's colour picker: shade square, hue bar, recent colours, "Pick from the room" |
 

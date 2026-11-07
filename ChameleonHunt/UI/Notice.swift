@@ -9,6 +9,7 @@
 //  about it, and at most two buttons: the likely one big and on the right.
 //
 
+import AVFoundation
 import SwiftUI
 
 struct Notice: Identifiable {
@@ -38,6 +39,34 @@ struct Notice: Identifiable {
         Notice(title: "No AR here",
                message: "This device can't place things in the room. The paint studio still works.",
                systemImage: "arkit")
+    }
+
+    /// The camera was turned off for the game (Don't Allow, or later in Settings). iOS only
+    /// asks once, so the way back is the game's page in Settings. Until v7.8 a refusal left
+    /// a black camera screen saying "The camera stopped".
+    static var cameraOff: Notice {
+        Notice(title: "Camera is off",
+               message: "The game is played through the camera. Turn it on in Settings.",
+               systemImage: "camera.fill", tint: Hunt.cyan,
+               primary: .init(title: "Open Settings", systemImage: "gearshape.fill") { AppSettings.open() },
+               secondary: .init(title: "Not now"))
+    }
+}
+
+/// The game's own page in the Settings app: the camera and Local Network switches.
+enum AppSettings {
+    @MainActor static func open() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
+    }
+}
+
+/// Whether the camera has been refused to the game. (Not yet asked counts as fine: ARKit
+/// asks the first time it starts.)
+enum CameraAccess {
+    static var isRefused: Bool {
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        return status == .denied || status == .restricted
     }
 }
 

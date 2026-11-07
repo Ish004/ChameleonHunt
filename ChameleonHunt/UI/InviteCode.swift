@@ -13,6 +13,8 @@ import SwiftUI
 
 struct InviteCode: View {
     var size: CGFloat = 116
+    /// Redraws when StoreKit says where this copy came from.
+    @ObservedObject private var origin = StoreOrigin.shared
 
     var body: some View {
         if let link = AppLinks.appStore, let code = Self.code(for: link.absoluteString) {

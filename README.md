@@ -139,6 +139,100 @@ while you walk around (see *Living camouflage*). Hand over; the seeker picks **E
 chameleon after the first. A found one pops back out as itself with a pink outline; when time runs out the rest come
 out too, outlined in white (v7.7).
 
+## v7.8: a pass for launch: stuck games, lost points, best times
+
+A read through the whole game for bugs before the App Store, and a few things for the
+bragging rights the game is played for. All of it is in code Swarm and Squad share where
+it's about chameleons; the rest is Squad's rules or one screen.
+
+**Squad: games that couldn't move on.** Each one left everyone with no way on but
+leaving the game.
+- *Everyone done, nothing hidden.* With **No limit** to hide, "Done hiding" can be pressed
+  with none down. If everyone did, there was nothing to hunt and no clock to end it. The
+  same happened when the one hiding in **Hider vs all** left. The host now goes back to
+  the lobby (`SquadRules.shouldReturnToLobby`).
+- *Everyone else left.* Alone in Sync up or hiding, the host sat there for good (syncing
+  needs two). Back to the lobby. Alone mid-hunt, the round ends there.
+- *Play again with one player* did nothing at all. The key says "Need 2 players" now, like
+  Start in the lobby.
+
+**Squad: points that disappeared.** A player who leaves (or whose phone stays away for
+more than 30 seconds) used to take all their chameleons with them, *including the ones
+already found*. So Ben's finds of Cy's vanished off Ben's score, on the results too, the
+moment Cy tapped Leave. Now, once the hunt has started, their chameleons stay: the found
+ones keep their finders' points, and the rest can still be found. (Before the hunt they
+still go with them.) Tags for a chameleon whose hider has gone say "Ben found one" or
+"Not found" rather than "Ben found 's".
+
+**Squad: smaller things.**
+- In a free-for-all with ten or more chameleons in the room (four players hiding three
+  each, say), the chameleon following your aim turned faded, the look for "can't go
+  here", though you could still drop it. Only your own count towards the ten now.
+- At time's up the host's screen said "Time's up · waiting for Ana", to Ana. Now just
+  "Time's up".
+- A guest whose phone couldn't get back into a game was told "Host left", though the
+  game was carrying on without them. Now "Connection lost · couldn't get back into Ana's
+  game".
+- On a phone, five or six players' results ran off the bottom of the screen. The board
+  scrolls now.
+
+**Swarm.**
+- *Backgrounded during 3-2-1.* The clock started anyway with nobody there and ran down
+  until the seeker came back. Now the hunt pauses with all its time, as it already did
+  once the clock was running.
+- *Closing with chameleons down* asks first ("Stop this game?"), as the paint studio does:
+  one stray tap on the corner used to throw the whole room's hiding away.
+
+**The camera turned off.** "Don't Allow" on the camera question left a black screen
+saying "The camera stopped · go back and try again", and trying again did the same, for
+ever: iOS only asks once. Now the game says **Camera is off** with an **Open Settings**
+key, both when it's refused and whenever a game is started without it
+(`Notice.cameraOff`).
+
+**Nobody showing up.** In Games nearby after 12 seconds with nothing, and in a host's
+lobby after 20 seconds alone, one line says the two usual reasons (not on the same Wi-Fi,
+or Local Network turned off for the game, which iOS also only asks about once) with an
+**Open Settings** key.
+
+**The App Store link only where it works.** The lobby's "Get the game" QR code and the
+link on shared pictures pointed at the App Store page, which doesn't exist until the game
+is out. Friends scanning it in TestFlight got "not available". They now appear only in a
+copy installed from the App Store (`AppLinks`, which asks StoreKit). `-debugStoreLinks`
+shows them in a test build.
+
+**New: best times in Swarm** (`Core/SwarmRecords.swift`). The quickest anyone on this
+device has found every one, for each level and each number hidden: six on Hard is its own
+record, two on Easy another. The results say **New best · 6 on Hard · 1:12** on sun (first
+place's colour) when it falls, and the standing best otherwise, so there's always a
+number to beat. Only a clean sweep without the hint counts. A shared picture of a new
+best says so. (Most games show a high score this way: the score big, the best small, a
+tag only when it's beaten.) `-debugPhase scatterWon` lays it out; add `best` for a
+standing best.
+
+**New: fastest find in Squad.** The host stamps each find with how far into the hunt it
+came (`SquadChameleon.foundAfter`), and the results show the round's quickest, in the
+finder's colour: "Fastest find · Ben · 0:12". A find from an older build has no time and
+is left out.
+
+**VoiceOver** now hears FOUND (Swarm: "Found. 3 of 6.") and the squad feed ("Ben found
+Cy's"), which were only a picture and a sound.
+
+**Store listing.** `AppStore/Listing.md` has a plainer description, promotional text and
+What's New, as a starting point for your own words (the earlier one is kept under it). It
+also fixes a line that had been wrong since v7.7: a find gets an outline in the finder's
+colour, it doesn't turn that colour all over.
+
+**Tests.** 21 new core checks (the stuck games, leaving mid-hunt, find times on the wire
+and from older builds, best times). The core tests also run on Linux now, against a small
+stand-in for Apple's `simd`, which is how this version was checked off a Mac.
+
+**Not checked on a device or a Mac yet.** This version was written without Xcode: the
+core tests pass, and every Swift file parses, but the app itself hasn't been built. Build
+it once before anything else; if something doesn't compile it will be in `GameStore`,
+`SquadGame`, `SquadViews`, `PhaseViews`, `Notice`, `ShareCard` or `ARSessionController`.
+Then on devices: the Camera is off card (Settings → ChameleonHunt → Camera off, then
+start Swarm); a squad where someone leaves mid-hunt; a new best in Swarm.
+
 ## v7.7: a found chameleon is a chameleon again; keys look like keys
 
 **Found.** Tapping a chameleon used to turn it one flat colour: pink in Swarm, the finder's colour in Squad. It read
@@ -1058,7 +1152,7 @@ licence unaccepted, run it with `DEVELOPER_DIR=/Library/Developer/CommandLineToo
 `-demoCamoStroke`, `-demoCamera <azimuth°> <elevation°> <distance>`, `-demoShading`, `-demoHideScan`,
 `-debugPhase placing|replacing|scanning|scanStuck|arCheckLocating|arCheckLost|arCheckVisible|handoff|seeking|paused|result|timeup|scatter|scatterHandoff|scatterSeeking|scatterResult` and `-debugDiagnostics` (overlay layout only),
 `-debugPhase hintReady|clue` (the hint key unlocked; used), `-debugPhase scatterPenalty` (a miss on Hard, with the
-"−5 s"), `-debugPhase scatterHinted` (the hint on), `-debugCoins <n>` and `-debugSkin <name>` (a wallet for screenshots, not
+"−5 s"), `-debugPhase scatterHinted` (the hint on), `-debugPhase scatterWon [best]` (every one found, with a new best or a standing one), `-debugStoreLinks` (the App Store QR code and share link, which otherwise only show in App Store copies), `-debugCoins <n>` and `-debugSkin <name>` (a wallet for screenshots, not
 saved), `-debugSkins` (the shop), `-debugDifficulty easy|medium|hard`, `-debugSideways` (the app laid out as a phone on its side, turned inside
 the upright screen, for Simulators that can't be rotated), `-debugSettings`, `-debugHowTo`, `-debugLiDAR` / `-debugNoLiDAR` (as on a device with or without LiDAR),
 `-debugNotice tooFast|tooDark|lostTracking|offCentre|tooClose|tooFar|spotMoved|blocked|surface` (a scan message),

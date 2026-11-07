@@ -1177,6 +1177,114 @@ do {
     check(!game.players.contains { $0.id == cy.id } && game.away.isEmpty, "anyone still away by the next lobby is gone")
 }
 
+section("Squad games that used to get stuck, or lose points (v7.8)")
+do {
+    func player(_ name: String) -> SquadPlayer { SquadPlayer(id: UUID(), name: name, colour: 0, arSession: UUID()) }
+    let ana = player("Ana"), ben = player("Ben"), cy = player("Cy")
+    func game(_ players: [SquadPlayer], mode: SquadMode = .freeForAll, hideSeconds: Int = 120) -> SquadState {
+        var state = SquadState()
+        state.settings.mode = mode
+        state.settings.hideSeconds = hideSeconds
+        for p in players { SquadRules.apply(.join(p), to: &state) }
+        SquadRules.apply(.startSync, to: &state)
+        for p in players { SquadRules.apply(.synced(p.id), to: &state) }
+        SquadRules.apply(.startHiding, to: &state)
+        return state
+    }
+
+    // No hide clock, and everyone said "Done hiding" without hiding anything: there was
+    // nothing to hunt and no clock to move it on.
+    var empty = game([ana, ben], hideSeconds: 0)
+    check(!SquadRules.shouldReturnToLobby(empty), "hiding with nothing hidden yet carries on")
+    SquadRules.apply(.doneHiding(ana.id), to: &empty)
+    SquadRules.apply(.doneHiding(ben.id), to: &empty)
+    check(SquadRules.everyoneDoneHiding(empty) && empty.chameleons.isEmpty && SquadRules.shouldReturnToLobby(empty),
+          "everyone done with nothing hidden: back to the lobby, not stuck")
+
+    // Hider vs all with no hide clock: the hider leaves, nobody else can hide.
+    var hiderLeft = game([ana, ben, cy], mode: .hiderVsAll, hideSeconds: 0)
+    let hider = hiderLeft.hider!
+    SquadRules.apply(.leave(hider), to: &hiderLeft)
+    check(SquadRules.shouldReturnToLobby(hiderLeft), "the hider leaving mid-hide sends everyone back to the lobby")
+
+    // Everyone else leaves.
+    var alone = game([ana, ben])
+    SquadRules.apply(.leave(ben.id), to: &alone)
+    check(SquadRules.shouldReturnToLobby(alone), "one player left while hiding: back to the lobby")
+    var syncingAlone = SquadState()
+    for p in [ana, ben] { SquadRules.apply(.join(p), to: &syncingAlone) }
+    SquadRules.apply(.startSync, to: &syncingAlone)
+    SquadRules.apply(.leave(ben.id), to: &syncingAlone)
+    check(SquadRules.shouldReturnToLobby(syncingAlone), "one player left while syncing: back to the lobby")
+
+    // Mid-hunt, a player whose phone never came back is removed — and used to take every
+    // find of their chameleons with them, even off the results.
+    var hunt = game([ana, ben, cy])
+    let cys = (0..<2).map { _ in SquadChameleon(id: UUID(), owner: cy.id, pose: "standing", scale: 0.8) }
+    let anas = SquadChameleon(id: UUID(), owner: ana.id, pose: "curled", scale: 0.8)
+    for c in cys + [anas] { SquadRules.apply(.placed(c), to: &hunt) }
+    SquadRules.apply(.startHunt, to: &hunt)
+    check(SquadRules.apply(.claim(chameleon: cys[0].id, by: ben.id), to: &hunt, elapsed: 12.4), "Ben finds one of Cy's")
+    check(hunt.chameleons.first { $0.id == cys[0].id }?.foundAfter == 12.4, "the host stamps how far into the hunt it was")
+    SquadRules.apply(.leave(cy.id), to: &hunt)
+    let benAfter = SquadRules.scores(hunt).first { $0.player.id == ben.id }!
+    check(benAfter.finds == 1, "Cy leaving mid-hunt doesn't take Ben's find away")
+    check(hunt.chameleons.contains { $0.id == cys[1].id } && SquadRules.findable(for: ana.id, in: hunt).contains { $0.id == cys[1].id },
+          "Cy's other one is still out there to be found")
+    check(!SquadRules.huntHasNobodyLeft(hunt), "two still playing: the hunt goes on")
+    SquadRules.apply(.claim(chameleon: anas.id, by: ben.id), to: &hunt, elapsed: 30)
+    SquadRules.apply(.claim(chameleon: cys[1].id, by: ana.id), to: &hunt, elapsed: 7.5)
+    let fastest = SquadRules.fastestFind(hunt)
+    check(fastest?.finder.id == ana.id && fastest?.seconds == 7.5, "the fastest find is the quickest of the round")
+    SquadRules.apply(.leave(ben.id), to: &hunt)
+    check(SquadRules.huntHasNobodyLeft(hunt), "everyone else gone: the hunt ends")
+    SquadRules.apply(.endRound, to: &hunt)
+    SquadRules.apply(.leave(ana.id), to: &hunt)
+    check(hunt.chameleons.count == 3, "on the results, leaving takes nothing off the board")
+
+    // Before the hunt, a leaver's chameleons still go with them (as tested above).
+    var hiding = game([ana, ben, cy])
+    SquadRules.apply(.placed(SquadChameleon(id: UUID(), owner: cy.id, pose: "standing", scale: 0.8)), to: &hiding)
+    SquadRules.apply(.leave(cy.id), to: &hiding)
+    check(hiding.chameleons.isEmpty, "leaving while hiding still takes your chameleons")
+
+    // A find from a build before v7.8 has no time: no fastest find, nothing breaks.
+    var old = game([ana, ben])
+    let bens = SquadChameleon(id: UUID(), owner: ben.id, pose: "standing", scale: 0.8)
+    SquadRules.apply(.placed(bens), to: &old)
+    SquadRules.apply(.startHunt, to: &old)
+    SquadRules.apply(.claim(chameleon: bens.id, by: ana.id), to: &old)
+    check(SquadRules.fastestFind(old) == nil, "a find with no time gives no fastest find")
+    let wire = try! JSONEncoder().encode(SquadMessage.state(hunt))
+    if case .state(let decoded) = try! JSONDecoder().decode(SquadMessage.self, from: wire) {
+        check(decoded == hunt, "find times survive being sent between devices")
+    } else {
+        check(false, "find times survive being sent between devices")
+    }
+    // A chameleon as an older build sends it (no find time at all) still reads.
+    let olderJSON = #"{"id":"\#(UUID().uuidString)","owner":"\#(UUID().uuidString)","pose":"standing","scale":0.8}"#
+    check((try? JSONDecoder().decode(SquadChameleon.self, from: Data(olderJSON.utf8)))?.foundAfter == nil,
+          "a chameleon from an older build still reads")
+}
+
+section("Swarm's best times (v7.8)")
+do {
+    var bests: [String: Int] = [:]
+    let key = SwarmRecords.key(difficulty: .hard, hidden: 6)
+    check(key != SwarmRecords.key(difficulty: .easy, hidden: 6) && key != SwarmRecords.key(difficulty: .hard, hidden: 5),
+          "each level and number hidden has its own record")
+    var result = SwarmRecords.update(&bests, key: key, seconds: 95, counts: true)
+    check(result.isNew && result.best == 95, "the first clean sweep is the record")
+    result = SwarmRecords.update(&bests, key: key, seconds: 120, counts: true)
+    check(!result.isNew && result.best == 95, "a slower one isn't")
+    result = SwarmRecords.update(&bests, key: key, seconds: 95, counts: true)
+    check(!result.isNew, "equalling it isn't a new best")
+    result = SwarmRecords.update(&bests, key: key, seconds: 40, counts: false)
+    check(!result.isNew && bests[key] == 95, "with the hint used, it doesn't count")
+    result = SwarmRecords.update(&bests, key: key, seconds: 71, counts: true)
+    check(result.isNew && bests[key] == 71, "a quicker one is the new best")
+}
+
 section("A little easier on a phone, a little harder on a big iPad")
 do {
     let base: Float = 0.75   // GameConfig.scatterLivingStrength

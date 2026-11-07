@@ -129,6 +129,8 @@ final class ARSessionController: NSObject, ObservableObject, ARSessionDelegate, 
     /// Points the edge arrow at the nearest chameleon still hidden (the clue in the
     /// "lots of them" game).
     var pointsToNearestHidden = false
+    /// The camera was refused to the game ("Don't Allow"), so the session can't run.
+    var onCameraRefused: (() -> Void)?
 
     static var isLiDARAvailable: Bool {
         #if DEBUG
@@ -797,12 +799,16 @@ final class ARSessionController: NSObject, ObservableObject, ARSessionDelegate, 
                 let finder = details.foundBy ?? (actor.isFound ? squadMe : nil)
                 let tag: ChameleonTags.Tag
                 if let finder {
-                    let who = finder == squadMe ? "You" : tagName(finder)
+                    let finderName = tagName(finder)
+                    let who = finder == squadMe ? "You" : finderName.isEmpty ? "Someone" : finderName
                     tag = .init(id: actor.id, point: point, name: "\(who) found \(whose(details.owner))",
                                 colour: Color(uiColor: squadColours[finder] ?? .white), kind: .found)
                 } else if actor.isMarked {
-                    let owner = details.owner == squadMe ? "Yours" : "\(tagName(details.owner))'s"
-                    tag = .init(id: actor.id, point: point, name: "\(owner) · not found",
+                    let name = tagName(details.owner)
+                    // (No name: its hider has left the game.)
+                    let label = details.owner == squadMe ? "Yours · not found"
+                        : name.isEmpty ? "Not found" : "\(name)'s · not found"
+                    tag = .init(id: actor.id, point: point, name: label,
                                 colour: Color(uiColor: squadColours[details.owner] ?? .white), kind: .notFound)
                 } else {
                     tag = .init(id: actor.id, point: point, name: "Yours", colour: Hunt.paper, kind: .mine)
@@ -820,7 +826,10 @@ final class ARSessionController: NSObject, ObservableObject, ARSessionDelegate, 
     }
 
     private func whose(_ owner: UUID) -> String {
-        owner == squadMe ? "yours" : "\(tagName(owner))'s"
+        if owner == squadMe { return "yours" }
+        // Its hider may have left the game; their chameleons stay in the hunt.
+        let name = tagName(owner)
+        return name.isEmpty ? "one" : "\(name)'s"
     }
 
     static func flatten(_ m: simd_float4x4) -> [Float] {
@@ -1229,8 +1238,12 @@ final class ARSessionController: NSObject, ObservableObject, ARSessionDelegate, 
         // Lots of them: the chameleon itself, in colour, is the only thing following the aim.
         if scatterMode {
             ghost.isEnabled = false
+            // Only this player's count towards the ten: in a squad the room also holds
+            // everyone else's, and from the tenth of those the aim used to turn faded
+            // ("can't go here") although the next one could still be dropped.
+            let mine = scatter.placed(by: squadMe ?? Player.local.id)
             scatter.showPreview(pose: pose, transform: mode == .placing ? frame.map { $0 * local } : nil,
-                                placeable: probe?.isPlaceable == true && scatter.count < ScatterStage.maximum)
+                                placeable: probe?.isPlaceable == true && mine < ScatterStage.maximum)
             return
         }
         guard let frame else {
@@ -2604,8 +2617,16 @@ final class ARSessionController: NSObject, ObservableObject, ARSessionDelegate, 
     }
 
     nonisolated func session(_ session: ARSession, didFailWithError error: Error) {
+        let refused = (error as? ARError)?.code == .cameraUnauthorized
         // Not the error's own text: players get what to do, not a system message.
-        MainActor.assumeIsolated { trackingHint = "The camera stopped · go back and try again" }
+        MainActor.assumeIsolated {
+            if refused {
+                trackingHint = "Camera is off · turn it on in Settings"
+                onCameraRefused?()
+            } else {
+                trackingHint = "The camera stopped · go back and try again"
+            }
+        }
     }
 
     nonisolated func sessionWasInterrupted(_ session: ARSession) {

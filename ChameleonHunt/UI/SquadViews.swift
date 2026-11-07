@@ -47,7 +47,10 @@ struct SquadView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: squad.reconnecting)
         .onChange(of: squad.hostLost) { _, lost in
             guard lost else { return }
-            showNotice(Notice(title: "Host left", message: "The game's over. Find another room, or host your own.",
+            let message = squad.hostLeftOnPurpose
+                ? "The game's over. Find another room, or host your own."
+                : "Couldn't get back into \(squad.hostName)'s game. Find another room, or host your own."
+            showNotice(Notice(title: squad.hostLeftOnPurpose ? "Host left" : "Connection lost", message: message,
                               systemImage: "wifi.exclamationmark", tint: Hunt.cyan,
                               primary: .init(title: "OK") { [squad] in squad.browse() }))
         }
@@ -124,6 +127,7 @@ private struct SquadHomeView: View {
     @ObservedObject var store: GameStore
     @ObservedObject var squad: SquadGame
     @State private var joining: PeerLink.Room?
+    @State private var lookingSince = Date()
     @Environment(\.showNotice) private var showNotice
 
     /// Games that are still in their lobby; one already under way can't take new players.
@@ -205,6 +209,11 @@ private struct SquadHomeView: View {
                         .font(.chat(.subheadline, weight: .bold))
                         .foregroundStyle(Hunt.muted)
                         .multilineTextAlignment(.center)
+                    // The usual reasons nothing shows: a different Wi-Fi, or Local Network
+                    // turned off for the game (iOS asks once, and a "Don't Allow" hides
+                    // every game nearby without a word).
+                    NetworkTip(since: lookingSince, after: 12,
+                               text: "Still nothing? Be on the same Wi-Fi as the host, with Local Network on for the game in Settings.")
                 }
                 .frame(maxWidth: .infinity, minHeight: 220)
                 .huntPanel()
@@ -272,6 +281,33 @@ private struct SearchingDot: View {
     }
 }
 
+/// After a while with nobody turning up: the two usual reasons, and the way to the
+/// game's page in Settings.
+private struct NetworkTip: View {
+    let since: Date
+    /// Seconds before it shows.
+    let after: TimeInterval
+    let text: String
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            if context.date.timeIntervalSince(since) > after {
+                VStack(spacing: 10) {
+                    Text(text)
+                        .font(.chat(.subheadline, weight: .bold))
+                        .foregroundStyle(Hunt.muted)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button { AppSettings.open() } label: { Label("Open Settings", systemImage: "gearshape.fill") }
+                        .buttonStyle(.huntSecondary)
+                }
+                .padding(.top, 6)
+                .transition(.opacity)
+            }
+        }
+    }
+}
+
 /// Which squad game this room gets, from who has LiDAR (SquadRules.roomSupport).
 private struct RoomSupportBadge: View {
     @ObservedObject var squad: SquadGame
@@ -315,6 +351,7 @@ private struct SectionLabel: View {
 
 private struct SquadLobbyView: View {
     @ObservedObject var squad: SquadGame
+    @State private var openedAt = Date()
 
     private var settings: SquadSettings { squad.state.settings }
     private var joined: Bool { squad.state.players.contains { $0.id == squad.me.id } }
@@ -375,6 +412,11 @@ private struct SquadLobbyView: View {
             Text("\(squad.state.players.count) of \(SquadState.maximumPlayers)")
                 .font(.chat(.subheadline, weight: .bold))
                 .foregroundStyle(Hunt.muted)
+            if squad.isHost, squad.state.players.count < 2 {
+                NetworkTip(since: openedAt, after: 20,
+                           text: "Nobody yet? Everyone needs the same Wi-Fi, with Local Network on for the game in Settings.")
+                    .frame(maxWidth: 420)
+            }
             RoomSupportBadge(squad: squad)
             // For friends in the room who don't have the game yet (once it's in the store).
             InviteCode()
@@ -960,8 +1002,10 @@ private struct SquadHuntHUD: View {
                 Countdown(until: squad.deadline) { seconds in
                     VStack(spacing: 12) {
                         if seconds == 0 {
-                            // The host ends the round; say so rather than sit there.
-                            CamHint(text: "Time's up · waiting for \(squad.hostName)", systemImage: "hourglass")
+                            // The host ends the round; say so rather than sit there. (The host
+                            // was told it was waiting for itself.)
+                            CamHint(text: squad.isHost ? "Time's up" : "Time's up · waiting for \(squad.hostName)",
+                                    systemImage: "hourglass")
                         } else if gaveUp {
                             CamHint(text: "You gave up · the rest are showing", systemImage: "flag.fill")
                         } else if !seeking {
@@ -1044,7 +1088,7 @@ private struct SquadHuntHUD: View {
         .sensoryFeedback(.warning, trigger: squad.missLockedUntil) { _, now in now != nil }
         .onChange(of: squad.lastEvent) { _, event in show(event) }
         .onAppear {
-            show(squad.lastEvent)
+            show(squad.lastEvent, announce: false)
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("-debugHuntMenu") { menuOpen = true }
             if ProcessInfo.processInfo.arguments.contains("-debugHintNotice") { showNotice(hintNotice) }
@@ -1069,8 +1113,10 @@ private struct SquadHuntHUD: View {
         }
     }
 
-    private func show(_ event: String?) {
+    private func show(_ event: String?, announce: Bool = true) {
         guard let event else { return }
+        // The feed, for VoiceOver too ("BEN FOUND CY'S" reads as words).
+        if announce { AccessibilityNotification.Announcement(event.capitalized).post() }
         feed = event
         feedBy = squad.lastEventBy
         Task {
@@ -1161,6 +1207,7 @@ private struct SquadResultsView: View {
                                 Spacer()
                                 shareButton
                             }
+                            fastestFind
                             ScrollView { board }
                                 .scrollBounceBehavior(.basedOnSize)
                                 .scrollIndicators(.hidden)
@@ -1192,7 +1239,11 @@ private struct SquadResultsView: View {
                                 board.frame(maxWidth: 520)
                             }
                         } else {
-                            board.frame(maxWidth: 520)
+                            // Scrolls if it must: six players on a phone, with the coins and
+                            // the keys, ran off the bottom of the screen.
+                            ScrollView { board.frame(maxWidth: 520).frame(maxWidth: .infinity).padding(.bottom, 8) }
+                                .scrollBounceBehavior(.basedOnSize)
+                                .scrollIndicators(.hidden)
                         }
                         Spacer(minLength: 0)
                         actions(showCoins: true)
@@ -1225,6 +1276,8 @@ private struct SquadResultsView: View {
 
     @ViewBuilder private func actions(showCoins: Bool) -> some View {
         if showCoins { CoinsEarned(amount: squad.coinsThisRound, detail: coinsDetail) }
+        // (On a phone on its side it's over the board instead: no height for it here.)
+        if showCoins { fastestFind }
         // Out in the room, every chameleon is now the colour of whoever got its point:
         // the finder's, or if nobody found it, the hider's.
         HUDPill(systemImage: "paintpalette.fill", text: "Colours show who scored")
@@ -1234,13 +1287,28 @@ private struct SquadResultsView: View {
                 Button(action: squad.backToLobby) { Label("Lobby", systemImage: "person.3.fill") }
                     .buttonStyle(HuntButtonStyle(kind: .secondary, large: true))
             } primary: {
-                Button(action: squad.playAgain) { Label("Play again", systemImage: "arrow.clockwise").frame(minWidth: 220) }
-                    .buttonStyle(.huntBig)
+                // Everyone else has left: say so, rather than a key that does nothing.
+                Button(action: squad.playAgain) {
+                    Label(squad.state.players.count < 2 ? "Need 2 players" : "Play again", systemImage: "arrow.clockwise")
+                        .frame(minWidth: 220)
+                }
+                .buttonStyle(.huntBig)
+                .disabled(squad.state.players.count < 2)
             } trailing: {
                 EmptyView()
             }
         } else {
             HUDPill(systemImage: "hourglass", text: "Waiting for \(squad.hostName)")
+        }
+    }
+
+    /// The round's quickest find, in the finder's colour: one more thing to brag about.
+    @ViewBuilder private var fastestFind: some View {
+        if let fastest = SquadRules.fastestFind(squad.state) {
+            let who = fastest.finder.id == squad.me.id ? "You" : fastest.finder.name
+            HUDPill(systemImage: "bolt.fill",
+                    text: "Fastest find · \(who) · \(GameConfig.stopwatch(Int(fastest.seconds.rounded())))",
+                    fill: Hunt.player(fastest.finder.colour))
         }
     }
 

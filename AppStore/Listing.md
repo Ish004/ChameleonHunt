@@ -24,12 +24,12 @@ doing work here. If the name is taken, try `ChameleonHunt: AR Hide & Seek` or
 Camouflage party game for 2-6
 ```
 
-## Promotional text (170 max) — 164
+## Promotional text (170 max) — 146
 
 Shown above the description; can be changed any time without a new version.
 
 ```
-Hide chameleons in your real room, then race your friends to find them, each on your own phone or passing one round. From across the room, they're very hard to see.
+Hide chameleons around your room and they take on its colours. Then your friends try to find them, each on their own phone or taking turns on one.
 ```
 
 ## Keywords (100 max, commas, no spaces) — 100
@@ -41,6 +41,42 @@ multiplayer,friends,augmented,reality,lidar,hidden,object,spot,find,lizard,paint
 Don't repeat words from the name or subtitle here — they're already searched.
 
 ## Description (4000 max)
+
+Rewritten in v7.8 to read less like a template: no dashes, no slogan lines, one idea
+per paragraph. It's a starting point for your own words; the earlier version is under
+it. (It also had one thing wrong since v7.7: a find gets an outline in the finder's
+colour now, it doesn't turn that colour all over.)
+
+```
+Hide and seek in your own room.
+
+You put a chameleon somewhere real: on a shelf, under the table, behind a plant. Paint it to match, or let it blend in by itself. Your friends then have a set time to find it and tap it through the camera.
+
+Furniture hides it properly. If you tuck one behind the sofa, the sofa covers it.
+
+There are three ways to play.
+
+Squad is the main one. Two to six people each use their own iPhone or iPad on the same Wi-Fi. Everyone hides a few, then everyone hunts everyone else's. A chameleon you find gets an outline in your colour and a tag with your name, and the scoreboard keeps count.
+
+Swarm needs one phone, passed round. One person drops up to ten chameleons around the room, and each one blends in by itself. The next person finds as many as they can before the time runs out. The game remembers the best time for each level.
+
+Paint & Hide is for one chameleon, painted by hand in a 3D studio with colours scanned from the hiding spot. It needs a device with LiDAR (iPhone Pro or iPad Pro).
+
+From across the room they are very hard to see, so you have to walk around and look. If you get stuck you can use the hint, or give up and see where they all were.
+
+Every find earns coins, and quicker finds earn more. Coins buy skins for your chameleon: plain colours, stripes, spots, gold. Using the hint halves the coins for the rest of that hunt. You can't buy coins with money.
+
+The chameleon keeps changing colour as you move. Swing the camera round fast and it falls a little behind, which is often how people spot it.
+
+After a round you can send a picture of the room with the chameleon still hidden and see if anyone can find it. Then send them the answer.
+
+There's no sign-up and there are no ads. The game collects no data, and Squad games only talk to the other devices in the room.
+
+Paint & Hide needs LiDAR (iPhone 12 Pro and later Pro models, iPad Pro 2020 and later). Swarm and Squad work on any iPhone or iPad that runs the app.
+```
+
+<details>
+<summary>Earlier wording (v7.7)</summary>
 
 ```
 Hide and seek, in your actual room.
@@ -76,10 +112,12 @@ No sign-up, no ads, no data collected. Squad games talk only to the devices in t
 Paint & Hide needs LiDAR (iPhone 12 Pro and later Pro models, iPad Pro 2020 and later). Swarm and Squad work on any iPhone or iPad that runs the app.
 ```
 
+</details>
+
 ## What's New (version 1.0)
 
 ```
-The first release. Hide one, hide a swarm, or play as a squad.
+First release. Play Squad with friends on their own phones, or Swarm on one phone passed round.
 ```
 
 ---

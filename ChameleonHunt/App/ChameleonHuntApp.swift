@@ -77,6 +77,7 @@ struct RootView: View {
         // Every question the game asks, in its own style (UI/Notice.swift).
         .notice($store.notice)
         .environment(\.showNotice) { [store] notice in store.notice = notice }
+        .task { await AppLinks.checkWhereFrom() }
         .onAppear {
             Sound.shared.prepare()
             #if DEBUG

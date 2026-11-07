@@ -167,7 +167,10 @@ struct DisplayCurve: Sendable, Equatable {
     func blended(with other: DisplayCurve, weight: Float = 0.5) -> DisplayCurve {
         var mixed: [[Float]] = []
         for channel in 0..<3 {
-            mixed.append((0..<256).map { response[channel * 256 + $0] * (1 - weight) + other.response[channel * 256 + $0] * weight })
+            mixed.append((0..<256).map { level -> Float in
+                let mine = response[channel * 256 + level], theirs = other.response[channel * 256 + level]
+                return mine * (1 - weight) + theirs * weight
+            })
         }
         return DisplayCurve(responses: mixed, feed: feed * (1 - weight) + other.feed * weight)
     }

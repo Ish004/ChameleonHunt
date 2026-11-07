@@ -863,13 +863,24 @@ struct ScatterHUD: View {
     @ObservedObject var store: GameStore
     @ObservedObject var ar: ARSessionController
     @ObservedObject var scatter: ScatterStage
+    @Environment(\.showNotice) private var showNotice
 
     private var full: Bool { scatter.count >= ScatterStage.maximum }
     private var canDrop: Bool { ar.probe?.isPlaceable == true && !full && scatter.geometriesReady && scatter.previewReady }
 
+    /// With some already down, closing asks first (as the paint studio does): one stray
+    /// tap on the corner used to throw a whole room's hiding away.
+    private func close() {
+        guard scatter.count > 0 else { store.exitToIntro(); return }
+        showNotice(Notice(title: "Stop this game?", message: "The ones you've dropped will be lost.",
+                          systemImage: "xmark", tint: Hunt.cherry,
+                          primary: .init(title: "Stop game") { [store] in store.exitToIntro() },
+                          secondary: .init(title: "Keep hiding")))
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            CameraHeader(systemImage: "xmark", buttonLabel: "Close", action: store.exitToIntro,
+            CameraHeader(systemImage: "xmark", buttonLabel: "Close", action: close,
                          title: "Drop them", detail: "Aim, then drop") {
                 HUDPill(systemImage: "lizard.fill", text: "\(scatter.count)/\(ScatterStage.maximum)",
                         tint: scatter.count > 0 ? Hunt.limeLip : Hunt.ink)
@@ -1470,6 +1481,8 @@ struct HuntHUD: View {
         #endif
         .onChange(of: store.foundCount) { _, found in
             guard found > 0, store.phase == .seeking else { return }
+            // The FOUND slam, for VoiceOver too.
+            AccessibilityNotification.Announcement("Found. \(found) of \(store.hiddenCount).").post()
             foundBanner += 1
             let shown = foundBanner
             showFound = true
@@ -1603,10 +1616,20 @@ struct ResultView: View {
                     Stat(value: GameConfig.stopwatch(max(0, store.roundDuration - store.secondsRemaining)), label: "Time",
                          colour: Hunt.sun)
                     Stat(value: "\(store.missCount)", label: "Misses")
-                    // A phone on its side: the coins go in the row, not under it.
-                    if verticalSizeClass == .compact { CoinsEarned(amount: store.coinsThisRound, compact: true) }
+                    // A phone on its side: the coins and the best go in the row, not under it
+                    // (there's no height for another line).
+                    if verticalSizeClass == .compact {
+                        CoinsEarned(amount: store.coinsThisRound, compact: true)
+                        if swarm, let best = store.swarmBest {
+                            Stat(value: GameConfig.stopwatch(best), label: store.isNewBest ? "New best" : "Best",
+                                 colour: store.isNewBest ? Hunt.sun : Hunt.paper)
+                        }
+                    }
                 }
-                if verticalSizeClass != .compact { CoinsEarned(amount: store.coinsThisRound) }
+                if verticalSizeClass != .compact {
+                    CoinsEarned(amount: store.coinsThisRound)
+                    if swarm { bestLine }
+                }
                 Spacer()
                 ActionBar {
                     Button(action: store.exitToIntro) { Label("Home", systemImage: "house.fill") }
@@ -1643,6 +1666,20 @@ struct ResultView: View {
         return seekerWon ? "Found" : "Escaped"
     }
 
+    /// Swarm's record for this level and number hidden (SwarmRecords): "New best" on sun
+    /// when this round set it, otherwise the standing best, to beat next time.
+    @ViewBuilder private var bestLine: some View {
+        if let best = store.swarmBest {
+            let setup = "\(store.hiddenCount) on \(store.swarmDifficulty.title)"
+            if store.isNewBest {
+                HUDPill(systemImage: "trophy.fill", text: "New best · \(setup) · \(GameConfig.stopwatch(best))", fill: Hunt.sun)
+                    .transition(.scale.combined(with: .opacity))
+            } else {
+                HUDPill(systemImage: "trophy.fill", text: "Best · \(setup) · \(GameConfig.stopwatch(best))")
+            }
+        }
+    }
+
     /// A picture of the room to send. With the paint job showing it's a puzzle; in pink,
     /// the answer.
     private func share() {
@@ -1651,7 +1688,8 @@ struct ResultView: View {
         let title: String = if puzzle {
             "Can you spot it?"
         } else if swarm {
-            seekerWon ? "All \(store.hiddenCount) found" : "\(store.foundCount) of \(store.hiddenCount) found"
+            seekerWon ? (store.isNewBest ? "New best: \(GameConfig.stopwatch(seconds))" : "All \(store.hiddenCount) found")
+                      : "\(store.foundCount) of \(store.hiddenCount) found"
         } else {
             seekerWon ? "Found in \(GameConfig.stopwatch(seconds))" : "Never found"
         }

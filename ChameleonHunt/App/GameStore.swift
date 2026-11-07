@@ -105,6 +105,10 @@ final class GameStore: ObservableObject {
     @Published private(set) var penaltiesTaken = 0
     /// Coins earned so far in this hunt (they go into the wallet as they're earned).
     @Published private(set) var coinsThisRound = 0
+    /// Swarm: the best time for this level and number hidden (SwarmRecords), as it stands
+    /// after this hunt, and whether this hunt set it.
+    @Published private(set) var swarmBest: Int?
+    @Published private(set) var isNewBest = false
 
     /// Whether the seeker can use the hint (Settings). There's no waiting for it any more:
     /// it's there from the start, and using it halves the coins from then on.
@@ -146,6 +150,8 @@ final class GameStore: ObservableObject {
         ar.onSeekerHit = { [weak self] in self?.seekerFound() }
         ar.onSeekerMiss = { [weak self] in self?.seekerMissed() }
         ar.onSeekerFoundOne = { [weak self] actor in self?.seekerFoundOne(actor) }
+        // "Don't Allow" on the camera question: say how to turn it back on.
+        ar.onCameraRefused = { [weak self] in self?.notice = .cameraOff }
     }
 
     var isDemo: Bool { studio?.scene.isDemo ?? false }
@@ -171,6 +177,10 @@ final class GameStore: ObservableObject {
         }
         guard newMode == .scatter || ARSessionController.isLiDARAvailable else {
             notice = .needsLiDAR
+            return false
+        }
+        guard !CameraAccess.isRefused else {
+            notice = .cameraOff
             return false
         }
         stopClock()
@@ -421,6 +431,8 @@ final class GameStore: ObservableObject {
         missCount = 0
         foundCount = 0
         coinsThisRound = 0
+        isNewBest = false
+        swarmBest = mode == .scatter ? Self.swarmBests[swarmRecordKey] : nil
         hintDropped = false
         hintAvailable = hintsOn
         isHuntPaused = false
@@ -469,6 +481,15 @@ final class GameStore: ObservableObject {
 
     func resumeHunt() {
         guard phase == .seeking, isHuntPaused else { return }
+        // Paused before the clock ever started (backgrounded during 3-2-1): start over
+        // with the countdown, so the seeker isn't dropped into a running hunt.
+        if let left = pausedRemaining, left >= TimeInterval(roundDuration), deadline == nil, foundCount == 0 {
+            isHuntPaused = false
+            pausedRemaining = nil
+            phase = .handoff
+            startHunt()
+            return
+        }
         isHuntPaused = false
         ar.setMode(.hunting)
         startClock(seconds: pausedRemaining ?? TimeInterval(roundDuration))
@@ -478,7 +499,18 @@ final class GameStore: ObservableObject {
     /// The app went to the background mid-hunt (a call, a notification tapped): stop the
     /// clock rather than let the seeker's time run out while they're away.
     func appWentAway() {
-        if phase == .seeking, !isHuntPaused, countdown == nil { pauseHunt() }
+        guard phase == .seeking, !isHuntPaused else { return }
+        guard countdown != nil else { pauseHunt(); return }
+        // Mid 3-2-1, the clock hasn't started: it used to start anyway, with nobody
+        // there, and run down in the background. Hold the whole of it until they're back.
+        clockTask?.cancel()
+        clockTask = nil
+        countdown = nil
+        deadline = nil
+        pausedRemaining = TimeInterval(roundDuration)
+        ar.captureHuntMap()
+        ar.setMode(.showing)
+        isHuntPaused = true
     }
 
     /// Back to the "pass the iPad" screen with a full clock.
@@ -563,11 +595,38 @@ final class GameStore: ObservableObject {
         pay(CoinRules.find(base: CoinRules.findBase(swarmDifficulty), elapsed: elapsed, of: TimeInterval(roundDuration),
                            hintOn: hintDropped))
         if ar.scatter.remaining == 0 {
+            // The clock as it stands at the last find, so the results' time is exact.
+            if let deadline {
+                secondsRemaining = max(0, min(roundDuration, Int(ceil(deadline.timeIntervalSinceNow))))
+            }
             stopClock()
+            noteSwarmRecord()
             playWin()
             ar.setMode(.showing)
             phase = .seekerWon
         }
+    }
+
+    // MARK: - Records
+
+    /// Swarm's best times, by level and number hidden (Core/SwarmRecords.swift).
+    private static var swarmBests: [String: Int] {
+        get { UserDefaults.standard.dictionary(forKey: "swarmBests") as? [String: Int] ?? [:] }
+        set { UserDefaults.standard.set(newValue, forKey: "swarmBests") }
+    }
+
+    private var swarmRecordKey: String {
+        SwarmRecords.key(difficulty: swarmDifficulty, hidden: hiddenCount)
+    }
+
+    /// Every one found: a record if it's the quickest clean sweep yet (no hint).
+    private func noteSwarmRecord() {
+        var bests = Self.swarmBests
+        let used = max(0, roundDuration - secondsRemaining)
+        let result = SwarmRecords.update(&bests, key: swarmRecordKey, seconds: used, counts: !hintDropped)
+        Self.swarmBests = bests
+        swarmBest = result.best
+        isNewBest = result.isNew
     }
 
     /// Coins for a find: into the wallet, and onto this hunt's count.
@@ -621,6 +680,11 @@ final class GameStore: ObservableObject {
     func openSquad() {
         guard ARSessionController.isARAvailable else {
             notice = .needsAR
+            return
+        }
+        // Squad needs the camera from Sync up on: better to say so now than in the lobby.
+        guard !CameraAccess.isRefused else {
+            notice = .cameraOff
             return
         }
         stopClock()
@@ -801,6 +865,17 @@ final class GameStore: ObservableObject {
                 foundCount = 4; missCount = 3; secondsRemaining = 0
                 coinsThisRound = 132
                 phase = .hiderWon
+            case "scatterWon":
+                // Every one found, and a new best (`-debugPhase scatterWon best` shows a
+                // standing best instead).
+                mode = .scatter
+                ar.scatter.debugFill(count: 6, found: 6)
+                foundCount = 6; missCount = 1
+                secondsRemaining = max(0, roundDuration - 72)
+                coinsThisRound = 214
+                swarmBest = value(after: "-debugPhase", offset: 2) == "best" ? 65 : 72
+                isNewBest = swarmBest == 72
+                phase = .seekerWon
             case "scanning": ar.debugScanProgress(0.42); phase = .scanning
             case "scanStuck": ar.debugScanProgress(0.2, stalled: true); phase = .scanning
             case "processing":

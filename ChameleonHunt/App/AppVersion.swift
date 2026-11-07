@@ -10,11 +10,11 @@
 import Foundation
 
 enum AppVersion {
-    static let number = "7.7"
-    static let built = "12 Oct 2026"
+    static let number = "7.8"
+    static let built = "7 Nov 2026"
 
     /// What changed in this build, for the home screen.
-    static let summary = "A found chameleon is itself again, with a rim in the finder's colour; the level chips are keys, and the facts above them plain words"
+    static let summary = "Squad games that got stuck move on, and finds stay when someone leaves; best times in Swarm, fastest find in Squad; a way back when the camera is off"
 
     /// The build label while testing; in the App Store build, the version players see
     /// there ("Version 1.0"), so the two never disagree.

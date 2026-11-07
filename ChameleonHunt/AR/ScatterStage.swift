@@ -64,6 +64,8 @@ final class ScatterStage: ObservableObject {
     }
 
     var count: Int { records.count }
+    /// How many one player has dropped (in a squad the room holds everyone's).
+    func placed(by owner: UUID) -> Int { records.filter { $0.hiddenBy.id == owner }.count }
     var foundCount: Int { records.filter(\.isFound).count }
     var remaining: Int { count - foundCount }
 

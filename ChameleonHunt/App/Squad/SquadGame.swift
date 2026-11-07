@@ -59,6 +59,9 @@ final class SquadGame: ObservableObject {
     static let huntLeadIn: TimeInterval = 4
     /// The host went away mid-game.
     @Published private(set) var hostLost = false
+    /// Why: the host left on purpose (it said so), or this device couldn't get back in.
+    /// The two used to read the same ("Host left"), though in the second the game went on.
+    @Published private(set) var hostLeftOnPurpose = false
     /// Guest: the connection to the host dropped mid-game and we're getting back in.
     @Published private(set) var reconnecting = false
     @Published private(set) var me: SquadPlayer
@@ -219,6 +222,7 @@ final class SquadGame: ObservableObject {
         deadline = nil
         lastEvent = nil
         hostLost = false
+        hostLeftOnPurpose = false
         roomCode = ""
     }
 
@@ -357,7 +361,10 @@ final class SquadGame: ObservableObject {
 
     private func applyAsHost(_ intent: SquadIntent) {
         var next = state
-        guard SquadRules.apply(intent, to: &next) else { return }
+        // A find is stamped with how far into the hunt it is on this clock, for the
+        // results' fastest find.
+        let elapsed = huntStartsAt.map { Date().timeIntervalSince($0) }
+        guard SquadRules.apply(intent, to: &next, elapsed: elapsed) else { return }
         next.version = state.version + 1
         if next.phase != state.phase || next.phaseNumber != state.phaseNumber { next.phaseStartedAt = Date() }
         adopt(next)
@@ -461,6 +468,7 @@ final class SquadGame: ObservableObject {
             #endif
             reconnectTask?.cancel()
             reconnecting = false
+            hostLeftOnPurpose = true
             hostLost = true
         case .pong(let sent, let host):
             guard !isHost else { return }
@@ -565,6 +573,7 @@ final class SquadGame: ObservableObject {
             SquadLog.note("gave up reconnecting")
             #endif
             self.reconnecting = false
+            self.hostLeftOnPurpose = false
             self.hostLost = true
         }
     }
@@ -732,8 +741,10 @@ final class SquadGame: ObservableObject {
     private func announceFinds(from previous: SquadState, to next: SquadState) {
         for chameleon in next.chameleons where chameleon.foundBy != nil {
             guard previous.chameleons.first(where: { $0.id == chameleon.id })?.foundBy == nil else { continue }
-            let finder = chameleon.foundBy == me.id ? "YOU" : (player(chameleon.foundBy)?.name.uppercased() ?? "?")
-            let owner = chameleon.owner == me.id ? "YOURS" : "\((player(chameleon.owner)?.name ?? "?").uppercased())'S"
+            let finder = chameleon.foundBy == me.id ? "YOU" : (player(chameleon.foundBy)?.name.uppercased() ?? "SOMEONE")
+            // Its hider may have left the game since (their chameleons stay in the hunt).
+            let owner = chameleon.owner == me.id ? "YOURS"
+                : player(chameleon.owner).map { "\($0.name.uppercased())'S" } ?? "ONE"
             lastEvent = "\(finder) FOUND \(owner)"
             lastEventBy = player(chameleon.foundBy)
             // Your own finds already chimed when you tapped.
@@ -755,6 +766,16 @@ final class SquadGame: ObservableObject {
 
     private func hostAdvance() {
         guard isHost else { return }
+        // Nothing left to play for (everyone else left, or nothing was hidden): back to
+        // the lobby instead of a game nobody can move on.
+        if SquadRules.shouldReturnToLobby(state) {
+            schedule(after: 0.8) { $0.applyAsHost(.backToLobby) }
+            return
+        }
+        if SquadRules.huntHasNobodyLeft(state) {
+            schedule(after: 0.8) { $0.applyAsHost(.endRound) }
+            return
+        }
         switch state.phase {
         case .syncing where SquadRules.everyoneSynced(state):
             schedule(after: 1.2) { $0.applyAsHost(.startHiding) }

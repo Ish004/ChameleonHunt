@@ -112,6 +112,9 @@ struct SquadChameleon: Codable, Hashable, Sendable, Identifiable {
     /// The skin its hider was wearing (a ChameleonSkin's name): what it looks like to
     /// everyone once it's found. Nil from a build before v7.7, which shows as Classic.
     var skin: String? = nil
+    /// Seconds into the hunt it was found, on the host's clock (v7.8), for the results'
+    /// "Fastest find". Nil if it wasn't found, or a build before v7.8 found it.
+    var foundAfter: Double? = nil
 }
 
 struct SquadState: Codable, Equatable, Sendable {
@@ -167,8 +170,9 @@ enum SquadIntent: Codable, Sendable {
 enum SquadRules {
 
     /// Applies an intent. Returns false if it was refused or changed nothing.
+    /// `elapsed`: for a find, how many seconds into the hunt it is on the host's clock.
     @discardableResult
-    static func apply(_ intent: SquadIntent, to state: inout SquadState) -> Bool {
+    static func apply(_ intent: SquadIntent, to state: inout SquadState, elapsed: Double? = nil) -> Bool {
         switch intent {
         case .join(var player):
             if let index = state.players.firstIndex(where: { $0.id == player.id }) {
@@ -191,8 +195,16 @@ enum SquadRules {
             state.synced.remove(id)
             state.doneHiding.remove(id)
             state.away.remove(id)
-            // Their chameleons go with them.
-            state.chameleons.removeAll { $0.owner == id }
+            state.gaveUp.remove(id)
+            if state.phase == .hunting || state.phase == .results {
+                // Once the hunt is on, their chameleons stay in the room: the ones already
+                // found keep their finders' points (a phone that dropped out for good used
+                // to take everyone's finds of its chameleons with it, even on the results),
+                // and the rest can still be found.
+            } else {
+                // Before that, their chameleons go with them.
+                state.chameleons.removeAll { $0.owner == id }
+            }
             if state.hider == id { state.hider = nil }
             return true
 
@@ -247,6 +259,7 @@ enum SquadRules {
                   hiddenCount(by: chameleon.owner, in: state) < state.settings.hiding else { return false }
             var placed = chameleon
             placed.foundBy = nil
+            placed.foundAfter = nil
             state.chameleons.append(placed)
             return true
 
@@ -275,6 +288,7 @@ enum SquadRules {
                   state.chameleons[index].owner != finder,
                   canSeek(finder, in: state) else { return false }
             state.chameleons[index].foundBy = finder
+            state.chameleons[index].foundAfter = elapsed.map { max(0, $0) }
             return true
 
         case .giveUp(let id):
@@ -339,6 +353,38 @@ enum SquadRules {
     /// True once every chameleon has been found — the hunt can end early.
     static func allFound(_ state: SquadState) -> Bool {
         !state.chameleons.isEmpty && state.chameleons.allSatisfy { $0.foundBy != nil }
+    }
+
+    /// Nothing left to play for: fewer than two players in a game that's under way, or
+    /// everyone done hiding with nothing hidden (only possible with no hide clock, or when
+    /// the one hiding in hider vs all leaves). The host goes back to the lobby rather than
+    /// sit there: both used to leave a game stuck with no way on but leaving it.
+    static func shouldReturnToLobby(_ state: SquadState) -> Bool {
+        switch state.phase {
+        case .syncing:
+            return state.players.count < 2
+        case .hiding:
+            return state.players.count < 2 || (everyoneDoneHiding(state) && state.chameleons.isEmpty)
+        default:
+            return false
+        }
+    }
+
+    /// Everyone else has left mid-hunt: the round ends there, with the board as it stands.
+    static func huntHasNobodyLeft(_ state: SquadState) -> Bool {
+        state.phase == .hunting && state.players.count < 2
+    }
+
+    /// The quickest find of the round (the results show it), and who made it.
+    static func fastestFind(_ state: SquadState) -> (chameleon: SquadChameleon, finder: SquadPlayer, seconds: Double)? {
+        state.chameleons
+            .compactMap { chameleon -> (SquadChameleon, SquadPlayer, Double)? in
+                guard let finder = chameleon.foundBy, let seconds = chameleon.foundAfter,
+                      let player = state.players.first(where: { $0.id == finder }) else { return nil }
+                return (chameleon, player, seconds)
+            }
+            .min { $0.2 < $1.2 }
+            .map { (chameleon: $0.0, finder: $0.1, seconds: $0.2) }
     }
 
     /// Anything this player could still find.
