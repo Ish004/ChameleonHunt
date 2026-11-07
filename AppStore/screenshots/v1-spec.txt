@@ -1,0 +1,20 @@
+# The App Store set: screens the Simulator can show (it has no camera). Add one or two
+# real-room shots from a device at the front when you have them (AppStore/README.md, step 7).
+#
+# image | first line / second line | chameleon, and what it's doing
+#   chameleon: natural, bubblegum, sky, tangerine, cherry, or any skin (tiger, zebra, gold…).
+#              The caption's second line takes its colour.
+#   doing:     standing, peeking, lying or curled (left out, they take turns).
+#
+# Then, from the project folder:
+#   sh Tools/build.sh && (cd AppStore/screenshots && ../../Tools/build/storeshots frame v1-spec.txt v1)
+sources/iphone-1-home.png | Hide and seek / in your room | natural standing
+sources/iphone-3-hunt.png | Hide yours. / Find theirs. | bubblegum peeking
+sources/iphone-2-lobby.png | 2 to 6 players / in one room | sky lying
+sources/iphone-4-seeker.png | Easy, medium / or hard | cherry curled
+sources/iphone-5-skins.png | Win coins. / Buy skins. | tiger standing
+sources/ipad-1-home.png | Hide and seek / in your room | natural standing
+sources/ipad-3-hunt.png | Hide yours. / Find theirs. | bubblegum peeking
+sources/ipad-2-lobby.png | 2 to 6 players / in one room | sky lying
+sources/ipad-4-seeker.png | Easy, medium / or hard | cherry curled
+sources/ipad-5-skins.png | Win coins. / Buy skins. | tiger standing
