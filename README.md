@@ -195,8 +195,9 @@ already says what to do in a few words. So:
 what iOS is about to ask ("Squad looks for your friends' phones on the same Wi-Fi. iOS asks
 about this next.") with one key, **Continue**, which leads straight to it. That's the
 pattern Apple's privacy guidelines give for a screen before a permission alert: one key,
-not "Allow", no way round it. The system's own question ("find devices on your local
-network") gave no reason, and a "Don't Allow" hides every game nearby.
+not "Allow", no way round it. Until now iOS asked the moment Squad opened, before
+anyone had chosen to host or join, and a "Don't Allow" hides every game nearby without a
+word.
 
 **Smaller things.**
 - The squad hunt's menu key is "more" (…), not three lines: the hamburger is the one menu
