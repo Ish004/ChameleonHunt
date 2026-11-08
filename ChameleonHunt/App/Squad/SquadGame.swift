@@ -120,7 +120,8 @@ final class SquadGame: ObservableObject {
 
     init(ar: ARSessionController, name: String) {
         self.ar = ar
-        me = SquadPlayer(id: UUID(), name: name, colour: 0, arSession: nil, lidar: ARSessionController.isLiDARAvailable)
+        me = SquadPlayer(id: UUID(), name: name, colour: SquadGame.preferredColour, arSession: nil,
+                         lidar: ARSessionController.isLiDARAvailable)
         link = PeerLink(name: name)
         link.onMessage = { [weak self] message, peer in self?.received(message, from: peer) }
         link.onCollaboration = { [weak self] data in self?.ar.receiveCollaboration(data) }
@@ -153,6 +154,7 @@ final class SquadGame: ObservableObject {
         leave()
         roomCode = String((0..<4).map { _ in "ABCDEFGHJKLMNPQRSTUVWXYZ".randomElement()! })
         me.arSession = ar.localSessionID
+        me.colour = Self.preferredColour
         state = SquadState()
         link.host(code: roomCode, name: me.name)
         SquadRules.apply(.join(me), to: &state)
@@ -173,7 +175,23 @@ final class SquadGame: ObservableObject {
 
     func join(_ room: PeerLink.Room) {
         roomCode = room.code
+        // Asks for the colour picked last time; the host gives the first free one if
+        // someone has it.
+        me.colour = Self.preferredColour
         link.join(room, as: me.id)
+    }
+
+    /// The colour this player picked last (Among Us keeps yours between games too).
+    static var preferredColour: Int {
+        get { UserDefaults.standard.integer(forKey: "squadColour") }
+        set { UserDefaults.standard.set(newValue, forKey: "squadColour") }
+    }
+
+    /// Picks another colour in the lobby, if nobody has it.
+    func pickColour(_ colour: Int) {
+        guard state.phase == .lobby, !state.players.contains(where: { $0.colour == colour }) else { return }
+        Self.preferredColour = colour
+        send(.colour(me.id, colour))
     }
 
     /// Back from the background. A host's room may have stopped being advertised.
@@ -651,6 +669,11 @@ final class SquadGame: ObservableObject {
             coinsForUnfound = bonus.unfound
             coinsForWinning = bonus.win
             Wallet.shared.earn(bonus.unfound + bonus.win)
+            // Onto the player's record (the profile): their finds, and a win for coming
+            // top (or level top) with a point, the same as the bonus.
+            if state.players.contains(where: { $0.id == me.id }) {
+                Stats.shared.noteRound(found: myFinds, won: bonus.win > 0)
+            }
             missLockedUntil = nil
             ar.squadTapLock = nil
             ar.pointsToNearestHidden = false

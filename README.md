@@ -139,6 +139,91 @@ while you walk around (see *Living camouflage*). Hand over; the seeker picks **E
 chameleon after the first. A found one pops back out as itself with a pink outline; when time runs out the rest come
 out too, outlined in white (v7.7).
 
+## v7.9: designed like the games it sits next to
+
+A design pass against Apple's guidelines for games and against how the best-loved party
+and character games do the same jobs. Mobbin has no actual games, only gamified apps, so
+the references are those apps for the shop and the profile, and the games themselves
+(Among Us, Fall Guys, Jackbox, Brawl Stars) plus Apple's "Designing for games",
+"Onboarding", "Menus" and "Privacy" pages for the rest. The look (stage, lettering,
+sticker keys, the toy chameleon) is unchanged; what changed is how the screens work.
+
+**Skins are a wardrobe you try on** (`UI/SkinShop.swift`). Every character customiser
+looked at (Tolan, Snapchat's Bitmoji, Meta's avatars, Replika, Alan, Finch) works the same
+way: the character big at the top, every item a small tile underneath with its price on
+it, tap a tile to see it on the character, one key to act. The old shop was a grid of
+cards, each with its own chameleon and its own key, and nothing could be seen on before
+buying.
+- The chameleon stands on a disc at the top (on the left, wide) in whatever was tapped
+  last. Under it, its name and one key: **Wear** (lime), **Get for 150** (sun, asks
+  first), a lime **Wearing** tag, or, out of reach, the price and "250 more" as plain
+  words (not a key: nothing to press yet).
+- The skins are on three rails: Colours, Patterns, Rare. A tile has a tick if it's worn
+  and the price if it isn't owned (sun when it can be had now).
+- Closing without putting anything on changes nothing.
+
+**A profile** (`UI/ProfileView.swift`, `App/Stats.swift`, `Core/PlayerStats.swift`). The
+home screen's top-left corner is the player now, as in most games' home screens (Brawl
+Stars' profile, the Among Us stats page): your chameleon in its skin, and your name where
+there's room. It opens a page with:
+- your chameleon and your name (moved from Settings: Apple's guidelines ask games to let
+  players present themselves, and the name is what friends see in a squad);
+- **your record**: Played, Found and Wins, as Readouts (Duolingo's chess puts Matches ·
+  Wins · rating under the game in the same way). Played is every hunt that reached its
+  end; a win is finding them all (Swarm, Paint & Hide) or coming top in a squad;
+- **Swarm best times**: for each level, the record with the most hidden ("6 in 1:12"),
+  or "Not yet".
+- Practice painting, which had that corner, is in Settings ("Practise painting"), and on
+  the Needs LiDAR card ("Try painting"), where it's most useful.
+
+**Pick your colour in the squad lobby** (`SquadIntent.colour`). Among Us lets everyone
+pick their colour before the game, no two the same, and remembers it. So does this now:
+six swatches under the crew, yours pressed in with a tick, others' faded. Your pick is
+remembered and asked for when you next host or join; if someone has it, you get the first
+free one. (Colours went by who joined first.) Guests and the host alike.
+
+**How to play is a reference, not a gate.** Apple's guidance for games is to teach
+through play, with a written tutorial "as a resource players can refer to … instead of
+making it a prerequisite", and onboarding kept to a few short pages. Every camera screen
+already says what to do in a few words. So:
+- it no longer opens by itself on the first launch (friends handed the app to join a
+  squad had five pages between them and the game);
+- the help key wears a lime dot until it's been opened once;
+- it's three pages, not five: Hide, Seek (with coins in a sentence), Squad or Swarm.
+
+**Asking about the local network in context.** The first time Squad opens, a card says
+what iOS is about to ask ("Squad looks for your friends' phones on the same Wi-Fi. iOS asks
+about this next.") with one key, **Continue**, which leads straight to it. That's the
+pattern Apple's privacy guidelines give for a screen before a permission alert: one key,
+not "Allow", no way round it. The system's own question ("find devices on your local
+network") gave no reason, and a "Don't Allow" hides every game nearby.
+
+**Smaller things.**
+- The squad hunt's menu key is "more" (…), not three lines: the hamburger is the one menu
+  icon Apple's guidelines rule out.
+- Settings for players: the seeker's time, the hint, sound, and the paint studio. The two
+  camera switches ("Things in front hide the chameleon", "Match the room's lighting") are
+  in test builds only: they only ever made Paint & Hide worse, and Apple's guidance is
+  good defaults over switches.
+- `-debugProfile` opens the profile, for screenshots.
+
+**Not done, and why.**
+- **Game Center** (leaderboards for the best times, Apple's first recommendation for
+  games) needs the capability turned on and leaderboards set up in App Store Connect,
+  under your Apple ID. Worth doing; the best times are already kept per level and number
+  hidden, which maps straight onto leaderboards.
+- **Menu music**: the party games all have it, but it can't be judged without hearing it.
+- **A playable tutorial** (Apple's first choice): hiding and finding a first chameleon
+  with hints is how the camera screens already work; a separate one would be more to
+  build than to gain right now.
+
+**Tests.** New core checks: the record, the best-time headline per level, and colours
+(your pick if free, never shared, lobby only, kept when you come back).
+
+**Not checked in Xcode or on a device.** As with v7.8, written without a Mac: build it
+first. New files: `UI/ProfileView.swift`, `App/Stats.swift`, `Core/PlayerStats.swift`;
+rewritten: `UI/SkinShop.swift`.
+
 ## v7.8: a pass for launch: stuck games, lost points, best times
 
 A read through the whole game for bugs before the App Store, and a few things for the
@@ -1154,7 +1239,7 @@ licence unaccepted, run it with `DEVELOPER_DIR=/Library/Developer/CommandLineToo
 `-debugPhase hintReady|clue` (the hint key unlocked; used), `-debugPhase scatterPenalty` (a miss on Hard, with the
 "−5 s"), `-debugPhase scatterHinted` (the hint on), `-debugPhase scatterWon [best]` (every one found, with a new best or a standing one), `-debugStoreLinks` (the App Store QR code and share link, which otherwise only show in App Store copies), `-debugCoins <n>` and `-debugSkin <name>` (a wallet for screenshots, not
 saved), `-debugSkins` (the shop), `-debugDifficulty easy|medium|hard`, `-debugSideways` (the app laid out as a phone on its side, turned inside
-the upright screen, for Simulators that can't be rotated), `-debugSettings`, `-debugHowTo`, `-debugLiDAR` / `-debugNoLiDAR` (as on a device with or without LiDAR),
+the upright screen, for Simulators that can't be rotated), `-debugSettings`, `-debugHowTo`, `-debugProfile`, `-debugLiDAR` / `-debugNoLiDAR` (as on a device with or without LiDAR),
 `-debugNotice tooFast|tooDark|lostTracking|offCentre|tooClose|tooFar|spotMoved|blocked|surface` (a scan message),
 `-demoPanel poses|colours|options|pose|clear` (with `-demoStudio`: a studio card or question open),
 `-debugSquad home|rooms|lobby|lobbyHard|lobbyGuest|lobbyGuestHard|lobbyMixed|lobbyLite|syncing|hiding|hidingAuto|lookAway|waiting|hunting|huntingHint|huntingMissed|huntingGaveUp|huntIntro [seconds]|results|resultsHost` (filled with four made-up

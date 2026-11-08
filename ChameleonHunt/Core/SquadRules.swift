@@ -148,8 +148,12 @@ struct SquadState: Codable, Equatable, Sendable {
 
 /// Something a player wants to happen. Only the host applies these.
 enum SquadIntent: Codable, Sendable {
+    /// Joining, or coming back. The player's `colour` is the one they'd like (v7.9): theirs
+    /// if nobody has it, otherwise the first free one.
     case join(SquadPlayer)
     case leave(UUID)
+    /// A player picks another colour in the lobby, if nobody else has it (v7.9).
+    case colour(UUID, Int)
     /// Their device dropped off mid-game (see SquadState.away); a join brings them back.
     case away(UUID)
     case settings(SquadSettings)
@@ -185,8 +189,19 @@ enum SquadRules {
             }
             guard state.players.count < SquadState.maximumPlayers, state.phase == .lobby else { return false }
             let used = Set(state.players.map(\.colour))
-            player.colour = (0..<SquadState.maximumPlayers).first { !used.contains($0) } ?? 0
+            let wanted = player.colour
+            if !(0..<SquadState.maximumPlayers).contains(wanted) || used.contains(wanted) {
+                player.colour = (0..<SquadState.maximumPlayers).first { !used.contains($0) } ?? 0
+            }
             state.players.append(player)
+            return true
+
+        case .colour(let id, let colour):
+            guard state.phase == .lobby, (0..<SquadState.maximumPlayers).contains(colour),
+                  let index = state.players.firstIndex(where: { $0.id == id }),
+                  state.players[index].colour != colour,
+                  !state.players.contains(where: { $0.colour == colour }) else { return false }
+            state.players[index].colour = colour
             return true
 
         case .leave(let id):

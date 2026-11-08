@@ -176,7 +176,7 @@ final class GameStore: ObservableObject {
             return false
         }
         guard newMode == .scatter || ARSessionController.isLiDARAvailable else {
-            notice = .needsLiDAR
+            notice = lidarNotice
             return false
         }
         guard !CameraAccess.isRefused else {
@@ -432,7 +432,7 @@ final class GameStore: ObservableObject {
         foundCount = 0
         coinsThisRound = 0
         isNewBest = false
-        swarmBest = mode == .scatter ? Self.swarmBests[swarmRecordKey] : nil
+        swarmBest = mode == .scatter ? Stats.shared.swarmBest(difficulty: swarmDifficulty, hidden: hiddenCount) : nil
         hintDropped = false
         hintAvailable = hintsOn
         isHuntPaused = false
@@ -562,6 +562,7 @@ final class GameStore: ObservableObject {
             Sound.shared.play(.lose)
             ar.setMode(.showing)
             if mode == .scatter { ar.scatter.revealUnfound() } else { ar.revealCharacter() }
+            noteRoundOver(won: false)
             phase = .hiderWon
         }
     }
@@ -583,6 +584,7 @@ final class GameStore: ObservableObject {
         Sound.shared.play(.lose)
         ar.setMode(.showing)
         if mode == .scatter { ar.scatter.revealUnfound() } else { ar.revealCharacter() }
+        noteRoundOver(won: false)
         phase = .hiderWon
     }
 
@@ -601,6 +603,7 @@ final class GameStore: ObservableObject {
             }
             stopClock()
             noteSwarmRecord()
+            noteRoundOver(won: true)
             playWin()
             ar.setMode(.showing)
             phase = .seekerWon
@@ -609,24 +612,27 @@ final class GameStore: ObservableObject {
 
     // MARK: - Records
 
-    /// Swarm's best times, by level and number hidden (Core/SwarmRecords.swift).
-    private static var swarmBests: [String: Int] {
-        get { UserDefaults.standard.dictionary(forKey: "swarmBests") as? [String: Int] ?? [:] }
-        set { UserDefaults.standard.set(newValue, forKey: "swarmBests") }
-    }
-
-    private var swarmRecordKey: String {
-        SwarmRecords.key(difficulty: swarmDifficulty, hidden: hiddenCount)
-    }
-
     /// Every one found: a record if it's the quickest clean sweep yet (no hint).
     private func noteSwarmRecord() {
-        var bests = Self.swarmBests
         let used = max(0, roundDuration - secondsRemaining)
-        let result = SwarmRecords.update(&bests, key: swarmRecordKey, seconds: used, counts: !hintDropped)
-        Self.swarmBests = bests
+        let result = Stats.shared.noteSwarmClear(difficulty: swarmDifficulty, hidden: hiddenCount, seconds: used,
+                                                 hintUsed: hintDropped)
         swarmBest = result.best
         isNewBest = result.isNew
+    }
+
+    /// The hunt has reached its end, one way or another: onto the player's record
+    /// (the profile page). Swarm counts its finds; Paint & Hide's one is a find and a win.
+    private func noteRoundOver(won: Bool) {
+        Stats.shared.noteRound(found: mode == .scatter ? foundCount : (won ? 1 : 0), won: won)
+    }
+
+    /// Paint & Hide on a device without LiDAR: say why, and offer the studio, which
+    /// works anywhere (it used to have its own key on the home screen).
+    var lidarNotice: Notice {
+        var notice = Notice.needsLiDAR
+        notice.secondary = .init(title: "Try painting") { [weak self] in self?.openDemo(surface: .floor) }
+        return notice
     }
 
     /// Coins for a find: into the wallet, and onto this hunt's count.
@@ -644,6 +650,7 @@ final class GameStore: ObservableObject {
         playWin()
         ar.setMode(.showing)
         ar.revealCharacter()
+        noteRoundOver(won: true)
         phase = .seekerWon
     }
 

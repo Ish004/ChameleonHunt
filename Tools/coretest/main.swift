@@ -1285,6 +1285,44 @@ do {
     check(result.isNew && bests[key] == 71, "a quicker one is the new best")
 }
 
+section("The profile: record, best times, your colour (v7.9)")
+do {
+    var stats = PlayerStats()
+    stats.noteRound(found: 4, won: false)
+    stats.noteRound(found: 6, won: true)
+    stats.noteRound(found: -2, won: false)
+    check(stats.played == 3 && stats.found == 10 && stats.wins == 1, "rounds, finds and wins add up (and nothing counts below zero)")
+    let saved = try! JSONDecoder().decode(PlayerStats.self, from: JSONEncoder().encode(stats))
+    check(saved == stats, "the record survives being saved")
+
+    let bests = ["hard-6": 72, "hard-4": 40, "hard-10": 300, "easy-3": 50, "medium-5": 90, "easyish-9": 1]
+    let hard = SwarmRecords.best(for: .hard, in: bests)
+    check(hard?.hidden == 10 && hard?.seconds == 300, "a level's headline is its record with the most hidden")
+    check(SwarmRecords.best(for: .easy, in: bests)?.hidden == 3, "…and only that level's (not a key that just starts the same)")
+    check(SwarmRecords.best(for: .medium, in: [:]) == nil, "no clean sweep yet: nothing to show")
+
+    func player(_ name: String, wants colour: Int = 0) -> SquadPlayer {
+        SquadPlayer(id: UUID(), name: name, colour: colour, arSession: UUID())
+    }
+    var lobby = SquadState()
+    let ana = player("Ana", wants: 3), ben = player("Ben", wants: 3), cy = player("Cy")
+    SquadRules.apply(.join(ana), to: &lobby)
+    SquadRules.apply(.join(ben), to: &lobby)
+    SquadRules.apply(.join(cy), to: &lobby)
+    let colours = lobby.players.map(\.colour)
+    check(colours[0] == 3, "a player gets the colour they last picked")
+    check(colours[1] != 3 && Set(colours).count == 3, "…unless someone has it already; nobody shares a colour")
+    check(!SquadRules.apply(.colour(ben.id, 3), to: &lobby), "you can't take a colour someone has")
+    check(SquadRules.apply(.colour(ben.id, 5), to: &lobby) && lobby.players[1].colour == 5, "a free one is yours")
+    check(!SquadRules.apply(.colour(ben.id, 9), to: &lobby), "there are only six")
+    var playing = lobby
+    SquadRules.apply(.startSync, to: &playing)
+    check(!SquadRules.apply(.colour(cy.id, 4), to: &playing), "colours are picked in the lobby, not mid-game")
+    let back = SquadPlayer(id: ana.id, name: "Ana", colour: 0, arSession: UUID())
+    SquadRules.apply(.join(back), to: &lobby)
+    check(lobby.players[0].colour == 3, "coming back keeps your colour")
+}
+
 section("A little easier on a phone, a little harder on a big iPad")
 do {
     let base: Float = 0.75   // GameConfig.scatterLivingStrength

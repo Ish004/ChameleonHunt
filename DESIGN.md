@@ -150,8 +150,10 @@ One job per colour:
 | Penalty flash | A cherry sticker, "−5 s", tilted, beside the clock for a second when a miss costs time (Swarm, Medium and Hard), with a warning haptic. In Squad the hunt's bottom line becomes "Missed · wait 5 s" with a cherry hand, counting down |
 | `HintKey` | The hint, bottom right of every hunt: a plain sun key, "Hint". It asks first (a `Notice`; "Keep looking" is the main key), and that card is where the cost is said in full: "For the rest of this hunt, each one you find earns half the coins." (v7.4 also had a HALF COINS tag on the key; it was removed as clutter, since the card already says it before anything is spent) |
 | `CoinIcon`, `CoinPill`, `CoinsEarned` | The coin (sun, ink edge, darker ring). Over the camera, bottom left: this hunt's coins on a paper pill that pops as it climbs, with a cherry HALF tag once the hint is on. On the results: a sun sticker "+110" with one line under it (what it was for, or what you have); on a phone held sideways just the sticker, in the stats row |
-| Skins shop (SkinShop.swift) | A full page like Settings: the coins on a paper sticker, then a grid of cards (the chameleon in the skin, its name, one key). The key is the price on sun, "Wear" on paper, or a lime Wearing tag; a skin out of reach isn't a key at all, just its price and "580 more". Buying asks first. One line at the bottom says skins are looks only |
-| Hunt menu (SquadViews.swift) | The squad hunt's top-left key (three lines) opens a `DropCard`: GAME, a **Show mine** switch (`PaperToggleStyle`) with one line under it, then **Give up** and **Leave game** as paper keys. Both ask first (a `Notice`; "Keep looking" / "Stay" is the main key). In pass-and-play, Give up is on the pause screen |
+| Wardrobe (SkinShop.swift, v7.9) | Laid out like every character customiser (Tolan, Bitmoji, Meta avatars, Replika): the chameleon big on a `cardHigh` disc in whatever was tapped last (left when wide, top when upright), its name in Lilita, and **one** key under it: **Wear** (lime), **Get for 150** on sun (asks first), a lime Wearing tag, or out of reach just the price and "250 more" as words. Below or beside it, three rails (Colours, Patterns, Rare) of square tiles on `card`; the one tried on has a 4pt lime edge; a corner badge is a lime tick on the worn one and the price on ones not owned (sun if affordable now, paper if not). One line at the bottom says skins are looks only. (Until v7.8: a grid of cards each with its own key, no try-on) |
+| Profile (ProfileView.swift, v7.9) | A full page like Settings: your chameleon on a disc beside the `NameField` ("What friends see in a squad."), **Your record** as `Readouts` (Played · Found in pink · Wins in sun), **Swarm best times** as three rows (level in Lilita, "6 in 1:12" in sun, or "Not yet"). Opened from the home screen's top-left key: your chameleon's face in its skin, with your name on an iPad |
+| Colour picker (SquadViews.swift, `ColourPicker`, v7.9) | In the lobby under the crew: YOUR COLOUR, six 44pt swatches in the player colours with ink edges and a hard shadow; yours pressed in with a tick and a 4pt edge, others' taken ones at 35%. Remembered between games |
+| Hunt menu (SquadViews.swift) | The squad hunt's top-left key ("more", …; three lines until v7.8, which is the hamburger Apple's guidelines rule out) opens a `DropCard`: GAME, a **Show mine** switch (`PaperToggleStyle`) with one line under it, then **Give up** and **Leave game** as paper keys. Both ask first (a `Notice`; "Keep looking" / "Stay" is the main key). In pass-and-play, Give up is on the pause screen |
 | `ChameleonTagLayer` (SquadViews.swift) | Name tags over chameleons in a squad: a small sticker, Lilita text, in the finder's colour with a magnifier ("Ben found Cy's"), the hider's with a crossed-out eye ("Cy's · not found"), or white with a person ("Yours") |
 | `Avatar` | A player's chameleon (front view, their tint) on a white token |
 | `CrewLineup` | The lobby line-up: chameleons with name plates in their colour, crown on the host |
@@ -213,10 +215,12 @@ Settings. Nothing is longer than about a second.
 ## Home and capability
 
 The home is a title screen: logo (tilted, outlined), the chameleon on its disc in the skin being worn (tap it; it
-does its trick), the coins as a paper key beside the practice-painting icon (it opens the skins shop), and the
+does its trick), top left the player (a paper key with their chameleon's face in its skin, and their name on an iPad;
+it opens the profile, v7.9) and the coins as a paper key beside it (it opens the wardrobe), and the
 two main games as keys with one line each — **Squad** (lime, "Everyone on their own phone") and **Swarm** (paper,
 "One phone, passed round") — and under them **Paint & Hide** as a smaller quiet key, lilac (with a NEEDS LIDAR tag where
-it's locked). Help, settings and practice painting are round icon keys in the corners. Nothing else: no tagline, no
+it's locked). Help and settings are round icon keys top right; help wears a lime dot until How to play has been
+opened once (it no longer opens by itself, v7.9). Practice painting is in Settings. Nothing else: no tagline, no
 headings. (Until v6.8 the keys were Pass & Play and Squad, with Paint & Hide and Swarm on a second screen; Paint &
 Hide was the main game. Playtesting found Squad and Swarm the ones people wanted, so they're one tap from home.) On a
 phone the keys stack; on its side they sit right of the chameleon. The Squad lobby shows one sticker saying

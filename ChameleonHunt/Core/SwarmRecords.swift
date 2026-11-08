@@ -38,4 +38,17 @@ enum SwarmRecords {
         bests[key] = seconds
         return (seconds, true)
     }
+
+    /// One line per level for the profile (v7.9): the record with the most hidden, the
+    /// quickest of those. Nil if there's no clean sweep at that level yet.
+    static func best(for difficulty: HuntDifficulty, in bests: [String: Int]) -> (hidden: Int, seconds: Int)? {
+        let prefix = "\(difficulty.rawValue)-"
+        var best: (hidden: Int, seconds: Int)?
+        for (key, seconds) in bests {
+            guard key.hasPrefix(prefix), let hidden = Int(key.dropFirst(prefix.count)) else { continue }
+            if let current = best, current.hidden > hidden || (current.hidden == hidden && current.seconds <= seconds) { continue }
+            best = (hidden, seconds)
+        }
+        return best
+    }
 }

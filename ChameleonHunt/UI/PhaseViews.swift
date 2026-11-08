@@ -41,8 +41,11 @@ struct IntroView: View {
     @State private var showSettings = false
     @State private var showHowTo = false
     @State private var showSkins = false
+    @State private var showProfile = false
     @ObservedObject private var wallet = Wallet.shared
-    /// The very first launch opens How to play once, before anything else.
+    /// Whether How to play has been opened. Until it has, its key wears a dot. (Until
+    /// v7.8 it opened by itself on the first launch; Apple's guidelines for games ask for
+    /// teaching through play, with a written tutorial there to look up, not to get past.)
     @AppStorage("seenHowTo") private var seenHowTo = false
     private let capability = DeviceCapability.current
 
@@ -58,19 +61,18 @@ struct IntroView: View {
         }
         .fullScreenCover(isPresented: $showHowTo) { HowToPlaySheet().statusBarHidden(true) }
         .fullScreenCover(isPresented: $showSkins) { SkinShopView().statusBarHidden(true) }
+        .fullScreenCover(isPresented: $showProfile) { ProfileView(store: store).statusBarHidden(true) }
         .onAppear {
             MascotLibrary.shared.warmUp()
             #if DEBUG
-            // `-debugSettings` / `-debugHowTo` / `-debugSkins` open straight onto those, for screenshots.
+            // `-debugSettings` / `-debugHowTo` / `-debugSkins` / `-debugProfile` open straight
+            // onto those, for screenshots.
             let args = ProcessInfo.processInfo.arguments
             if args.contains("-debugSettings") { showSettings = true }
             if args.contains("-debugHowTo") { showHowTo = true }
             if args.contains("-debugSkins") { showSkins = true }
+            if args.contains("-debugProfile") { showProfile = true }
             #endif
-            if !seenHowTo {
-                seenHowTo = true
-                if !showSettings && !showHowTo && !showSkins { showHowTo = true }
-            }
         }
     }
 
@@ -82,7 +84,10 @@ struct IntroView: View {
         let sideways = size.width > size.height && size.height < 500
         return VStack(spacing: 0) {
             HStack(spacing: 12) {
-                IconButton(systemImage: "paintbrush.pointed.fill", label: "Practice painting") { store.openDemo(surface: .floor) }
+                // The player, top left, as in most games' home screens: their chameleon in
+                // its skin (and their name, where there's room). Practice painting, which
+                // had this corner, is in Settings now.
+                ProfileKey(name: store.playerName, skin: wallet.skin, showsName: roomy) { showProfile = true }
                 // The coins, and the way to what they buy.
                 Button { showSkins = true } label: {
                     HStack(spacing: 8) {
@@ -100,7 +105,21 @@ struct IntroView: View {
                 .buttonStyle(.huntSecondary)
                 .accessibilityLabel("Skins. You have \(wallet.coins) coins.")
                 Spacer()
-                IconButton(systemImage: "questionmark", label: "How to play") { showHowTo = true }
+                IconButton(systemImage: "questionmark", label: "How to play") {
+                    seenHowTo = true
+                    showHowTo = true
+                }
+                // A dot until it's been opened once: here if you want it, never in the way.
+                .overlay(alignment: .topTrailing) {
+                    if !seenHowTo {
+                        Circle().fill(Hunt.lime)
+                            .frame(width: 16, height: 16)
+                            .overlay(Circle().strokeBorder(Hunt.ink, lineWidth: 2.5))
+                            .offset(x: 2, y: -2)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
+                    }
+                }
                 IconButton(systemImage: "gearshape.fill", label: "Settings") { showSettings = true }
             }
             .padding(.horizontal, Hunt.gutter)
@@ -163,7 +182,7 @@ struct IntroView: View {
     private var paintAndHide: some View {
         Button {
             if capability == .noAR { store.notice = .needsAR; return }
-            capability == .lidar ? store.beginHiding() : (store.notice = .needsLiDAR)
+            capability == .lidar ? store.beginHiding() : (store.notice = store.lidarNotice)
         } label: {
             HStack(spacing: 8) {
                 Label("Paint & Hide", systemImage: "paintbrush.pointed.fill")
@@ -210,6 +229,61 @@ struct IntroView: View {
             ShowText(text: "HUNT", size: 80 * scale, fill: Hunt.lime)
         }
         .padding(.vertical, 8)
+    }
+}
+
+/// The player's key, top left of the home screen: their chameleon's face in its skin on
+/// a round white key, the size of the icon keys (it took the practice-painting key's
+/// place, and a phone's top row has no room to spare); on an iPad, with their name.
+private struct ProfileKey: View {
+    let name: String
+    let skin: ChameleonSkin
+    let showsName: Bool
+    let action: () -> Void
+
+    var body: some View {
+        if showsName {
+            Button(action: action) {
+                HStack(spacing: 10) {
+                    face(size: 34)
+                    Text(name).lineLimit(1)
+                }
+                .fixedSize()
+            }
+            .buttonStyle(.huntSecondary)
+            .accessibilityLabel("Profile, \(name)")
+        } else {
+            Button(action: action) {
+                face(size: 40).frame(width: 52, height: 52)
+            }
+            .buttonStyle(RoundKey())
+            .accessibilityLabel("Profile, \(name)")
+        }
+    }
+
+    private func face(size: CGFloat) -> some View {
+        MascotImage(pose: .standing, view: .front, resolution: 120, skin: skin)
+            .scaleEffect(1.25)
+            .offset(y: size * 0.09)
+            .frame(width: size, height: size)
+            .background(Circle().fill(Hunt.paperLip))
+            .clipShape(Circle())
+            .overlay(Circle().strokeBorder(Hunt.ink, lineWidth: 2))
+    }
+
+    /// The icon keys' round press (IconButton), for a face instead of a symbol.
+    private struct RoundKey: ButtonStyle {
+        func makeBody(configuration: Configuration) -> some View {
+            configuration.label
+                .background(Circle().fill(Hunt.paper))
+                .overlay(Circle().strokeBorder(Hunt.ink, lineWidth: Hunt.outline))
+                .offset(y: configuration.isPressed ? 4 : 0)
+                .background(Circle().fill(Hunt.paperLip).overlay(Circle().strokeBorder(Hunt.ink, lineWidth: Hunt.outline)).offset(y: 5))
+                .padding(.bottom, 5)
+                .animation(.spring(response: 0.18, dampingFraction: 0.6), value: configuration.isPressed)
+                .onChange(of: configuration.isPressed) { _, down in if down { Sound.shared.play(.tap) } }
+                .contentShape(Circle())
+        }
     }
 }
 
@@ -438,17 +512,17 @@ private final class DeviceTilt: ObservableObject {
     }
 }
 
-/// The game in four pages.
+/// The game in three pages (five until v7.8: Apple's guidelines keep onboarding to a
+/// few short pages, and the rest is learnt by playing — every camera screen says what to
+/// do). Opened from the home screen's help key, never forced.
 struct HowToPlaySheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var page = 0
 
     private let pages: [(pose: CharacterPose, tint: MascotTint, title: String, line: String)] = [
-        (.standing, .natural, "Squad", "Everyone on their own phone. Hide yours, hunt everyone else's."),
-        (.lying, .sky, "Swarm", "One phone: hide a few around the room, then pass it on."),
-        (.standing, .sun, "Blend", "They change colour to match the room."),
-        (.curled, .natural, "Seek", "Tap what you spot. The closer you get, the easier they are to see."),
-        (.standing, .tangerine, "Coins", "Quicker finds pay more. The hint halves a hunt's coins. Spend them on skins."),
+        (.standing, .sun, "Hide", "Drop chameleons around the room. Each one takes on the colours around it."),
+        (.curled, .natural, "Seek", "Tap what you spot. The closer you get, the easier they are to see. Quicker finds pay more coins."),
+        (.lying, .sky, "Squad or Swarm", "Squad: everyone on their own phone. Swarm: one phone, passed round."),
     ]
 
     var body: some View {
@@ -548,7 +622,7 @@ struct HowToPlaySheet: View {
     }
 }
 
-/// Settings, on the stage: time, clue, name, and the few switches that matter.
+/// Settings, on the stage: the seeker's time, the hint, sound, and the paint studio.
 struct SettingsView: View {
     @ObservedObject var store: GameStore
     @ObservedObject var ar: ARSessionController
@@ -575,28 +649,44 @@ struct SettingsView: View {
                                 .foregroundStyle(Hunt.muted)
                         }
                     }
-                    section("Your name", systemImage: "person.fill") {
-                        NameField(name: $store.playerName)
-                    }
                     section("Sound", systemImage: "speaker.wave.2.fill") {
                         Toggle("Sound effects", isOn: $soundOn)
                             .toggleStyle(HuntToggleStyle())
                     }
+                    // The paint studio with a built-in room: works on any device. (It had a
+                    // key on the home screen until v7.9; that corner is the profile now.)
+                    section("Paint studio", systemImage: "paintbrush.pointed.fill") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Practise painting a chameleon into a room, no camera needed.")
+                                .font(.chat(.subheadline, weight: .bold))
+                                .foregroundStyle(Hunt.muted)
+                            Button {
+                                dismiss()
+                                store.openDemo(surface: .floor)
+                            } label: {
+                                Label("Practise painting", systemImage: "paintbrush.pointed.fill")
+                            }
+                            .buttonStyle(.huntSecondary)
+                        }
+                    }
+                    #if DEBUG
+                    // For testing only. Players get the defaults: Apple's guidelines ask games
+                    // for good defaults over switches, and these two only ever made Paint &
+                    // Hide worse. (The name is on the profile page now.)
                     section("Camera", systemImage: "camera.fill") {
                         VStack(spacing: 6) {
                             Toggle("Things in front hide the chameleon", isOn: $presenter.occlusionEnabled)
                             Divider().overlay(Hunt.ink)
                             Toggle("Match the room's lighting", isOn: $ar.lightingMatchEnabled)
-                            #if DEBUG
                             Divider().overlay(Hunt.ink)
                             Toggle("Debug info", isOn: $ar.showDiagnostics)
                             Divider().overlay(Hunt.ink)
                             // Off uses the curve fitted to the playtest screenshots only.
                             Toggle("Debug: measure colours", isOn: $ar.measuresColours)
-                            #endif
                         }
                         .toggleStyle(HuntToggleStyle())
                     }
+                    #endif
                     Text(AppVersion.label)
                         .font(.chat(.caption, weight: .bold))
                         .foregroundStyle(Hunt.muted)

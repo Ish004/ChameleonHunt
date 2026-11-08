@@ -128,6 +128,8 @@ private struct SquadHomeView: View {
     @ObservedObject var squad: SquadGame
     @State private var joining: PeerLink.Room?
     @State private var lookingSince = Date()
+    /// Whether the game has said why iOS is about to ask about the local network.
+    @AppStorage("askedLocalNetwork") private var askedLocalNetwork = false
     @Environment(\.showNotice) private var showNotice
 
     /// Games that are still in their lobby; one already under way can't take new players.
@@ -156,7 +158,22 @@ private struct SquadHomeView: View {
             }
         }
         .onAppear {
-            if squad.link.role == nil { squad.browse() }
+            guard squad.link.role == nil else { return }
+            if askedLocalNetwork {
+                squad.browse()
+            } else {
+                // The first time: say what the question iOS is about to ask is for (it
+                // reads as "find devices on your local network", and a "Don't Allow"
+                // hides every game nearby). One key, which leads straight to it, as
+                // Apple's guidelines ask of a screen before a permission alert.
+                showNotice(Notice(title: "Find friends nearby",
+                                  message: "Squad looks for your friends' phones on the same Wi-Fi. iOS asks about this next.",
+                                  systemImage: "antenna.radiowaves.left.and.right", tint: Hunt.cyan,
+                                  primary: .init(title: "Continue") { [squad] in
+                                      UserDefaults.standard.set(true, forKey: "askedLocalNetwork")
+                                      squad.browse()
+                                  }))
+            }
         }
         .onChange(of: squad.link.joinFailures) { _, _ in
             guard let room = joining else { return }
@@ -308,6 +325,54 @@ private struct NetworkTip: View {
     }
 }
 
+/// Your colour, picked in the lobby (v7.9), the way Among Us does it: six swatches, yours
+/// pressed in with a tick, the ones someone else has faded. It's remembered for next
+/// time. (Colours went by who joined first until v7.8.)
+private struct ColourPicker: View {
+    @ObservedObject var squad: SquadGame
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Text("YOUR COLOUR")
+                .font(.hunt(16, relativeTo: .headline))
+                .foregroundStyle(Hunt.muted)
+                .accessibilityAddTraits(.isHeader)
+            HStack(spacing: 10) {
+                ForEach(0..<SquadState.maximumPlayers, id: \.self) { index in swatch(index) }
+            }
+        }
+        .sensoryFeedback(.selection, trigger: squad.me.colour)
+    }
+
+    private func swatch(_ index: Int) -> some View {
+        let owner = squad.state.players.first { $0.colour == index }
+        let mine = owner?.id == squad.me.id
+        let taken = owner != nil && !mine
+        let name = Hunt.playerColourName(index).capitalizedFirst
+        let label: String = mine ? "\(name), yours" : taken ? "\(name), taken by \(owner?.name ?? "someone")" : name
+        return Button { squad.pickColour(index) } label: {
+            ZStack {
+                Circle().fill(Hunt.player(index))
+                if mine {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 16, weight: .black))
+                        .foregroundStyle(Hunt.ink)
+                }
+            }
+            .frame(width: 44, height: 44)
+            .overlay(Circle().strokeBorder(Hunt.ink, lineWidth: mine ? 4 : Hunt.outline))
+            .offset(y: mine ? 2 : 0)
+            .background(Circle().fill(Hunt.ink).offset(y: 4))
+            .opacity(taken ? 0.35 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.6), value: mine)
+        }
+        .buttonStyle(.plain)
+        .disabled(owner != nil)
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(mine ? .isSelected : [])
+    }
+}
+
 /// Which squad game this room gets, from who has LiDAR (SquadRules.roomSupport).
 private struct RoomSupportBadge: View {
     @ObservedObject var squad: SquadGame
@@ -409,6 +474,7 @@ private struct SquadLobbyView: View {
             .accessibilityLabel("Room \(squad.roomCode.map(String.init).joined(separator: " "))")
             CrewLineup(players: squad.state.players, me: squad.me.id, hostID: squad.state.players.first?.id, size: size)
                 .sensoryFeedback(.impact(weight: .medium), trigger: squad.state.players.count)
+            ColourPicker(squad: squad)
             Text("\(squad.state.players.count) of \(SquadState.maximumPlayers)")
                 .font(.chat(.subheadline, weight: .bold))
                 .foregroundStyle(Hunt.muted)
@@ -1107,7 +1173,9 @@ private struct SquadHuntHUD: View {
 
     private var huntStatus: some View {
         HStack(spacing: 10) {
-            IconButton(systemImage: "line.3.horizontal", label: "Menu") { menuOpen = true }
+            // "More", not three lines: the hamburger is the one menu icon Apple's
+            // guidelines rule out.
+            IconButton(systemImage: "ellipsis", label: "More") { menuOpen = true }
             Countdown(until: squad.deadline) { ClockPill(seconds: $0) }
             HUDPill(systemImage: "lizard.fill", text: "\(left) left", tint: Hunt.limeLip)
         }
